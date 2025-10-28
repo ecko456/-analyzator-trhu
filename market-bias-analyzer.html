@@ -138,13 +138,13 @@
                 </div>
             </div>
             
-            <!-- Karta 2: COT Report (Simulovaný) -->
-            <div class="bg-gray-700 p-5 rounded-lg shadow-lg">
+            <!-- Karta 2: COT Report (REÁLNÉ) -->
+            <div class="bg-gray-700 p-5 rounded-lg shadow-lg border-2 border-orange-500">
                 <div class="flex items-center mb-2">
-                    <ion-icon name="people-circle-outline" class="text-green-400 text-2xl mr-3"></ion-icon>
-                    <h4 class="text-lg font-semibold">COT Report <span class="text-xs text-green-300">(Simul.)</span></h4>
+                    <ion-icon name="people-circle-outline" class="text-orange-400 text-2xl mr-3"></ion-icon>
+                    <h4 class="text-lg font-semibold">COT Report <span class="text-xs text-orange-300">(Reálné)</span></h4>
                 </div>
-                <p class="text-xs text-gray-400 -mt-2 mb-2">(Pozice velkých fondů)</p>
+                <p class="text-xs text-gray-400 -mt-2 mb-2">(Netto pozice fondů)</p>
                 <p id="cot-bias" class="text-2xl font-bold">&mdash;</p>
                 <p id="cot-score" class="text-sm text-gray-400">Příspěvek ke skóre: 0</p>
             </div>
@@ -194,9 +194,9 @@
                     "probabilityText": "75% pravděpodobnost růstu",
                     "forecast": [90, 92, 95, 93, 96, 98, 100, 97, 95, 98, 100, 102, 105, 103, 100, 98, 100, 102, 105, 107, 110, 108, 105, 107, 105, 103, 100, 98, 95, 92] 
                 },
-                "cot": { "bias": "Extrém. Nákupy", "score": 40 },
-                "history": [-10, -5, 0, -2, 5, 8, 10, 5, 8, 12, 10, 15, 12, 10, 8, 5, 10, 12, 15, 18, 20, 22, 25, 20, 22, 24, 20, 18, 20, 25, 22, 20, 18, 15, 12, 10, 8, 10, 12, 15, 10, 12, 10, 15, 18, 20, 25, 22, 20, 15, 10, 12, 15, 18, 20, 22, 25, 28, 30, 28, 10, 15, 20, 25, 30, 25, 30, 32, 28, 30, 33, 30, 32, 35, 38, 40, 35, 40, 50, 45, 55, 60, 70, 65, 75, 80, 85, 80, 88, 90],
-                "priceForecast": [1.126, 1.127, 1.128, 1.127, 1.129, 1.130, 1.132, 1.131, 1.129, 1.131, 1.133, 1.135, 1.138, 1.137, 1.135, 1.134, 1.135, 1.136, 1.138, 1.140, 1.142, 1.141, 1.139, 1.140, 1.139, 1.138, 1.136, 1.135, 1.133, 1.131]
+                "cotConfig": { "symbol": "EUR" },
+                "history": [-10, -5, 0, -2, 5, 8, 10, 5, 8, 12, 10, 15, 12, 10, 8, 5, 10, 12, 15, 18, 20, 22, 25, 20, 22, 24, 20, 18, 20, 25, 22, 20, 18, 15, 12, 10, 8, 10, 12, 15, 10, 12, 10, 15, 18, 20, 25, 22, 20, 15, 10, 12, 15, 18, 20, 22, 25, 28, 30, 28, 10, 15, 20, 25, 30, 25, 30, 32, 28, 30, 33, 30, 32, 35, 38, 40, 35, 40, 50, 45, 55, 60, 70, 65, 75, 80, 85, 80, 88, 90]
+                // "priceForecast": [...] // ODSTRANĚNO
             },
             "gold": { // Pro zlato použijeme XAU/USD
                 "apiConfig": {
@@ -211,9 +211,9 @@
                     "probabilityText": "65% pravděpodobnost poklesu",
                     "forecast": [-70, -72, -75, -73, -70, -68, -70, -75, -78, -80, -82, -85, -83, -80, -78, -80, -82, -80, -75, -70, -68, -65, -68, -70, -72, -75, -78, -80, -82, -80]
                 },
-                "cot": { "bias": "Extrém. Prodeje", "score": -40 },
-                "history": [20, 15, 10, 12, 8, 5, 0, -2, 5, 0, -5, -2, 0, 5, 8, 10, 5, 2, 0, -2, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, -5, -8, -10, -5, -8, -10, -12, -15, -10, -8, -5, -2, 0, -2, -5, -8, -10, -12, -15, -10, -5, -10, -10, -15, -20, -18, -15, -12, -10, -15, -18, -20, -22, -25, -20, -18, -20, -25, -30, -35, -40, -50, -45, -55, -60, -65, -70, -65, -75, -70],
-                "priceForecast": [2124, 2122, 2115, 2117, 2110, 2108, 2110, 2105, 2098, 2090, 2088, 2085, 2087, 2090, 2092, 2090, 2088, 2090, 2095, 2100, 2102, 2105, 2103, 2100, 2098, 2095, 2092, 2090, 2088, 2090]
+                "cotConfig": { "symbol": "GOLD" },
+                "history": [20, 15, 10, 12, 8, 5, 0, -2, 5, 0, -5, -2, 0, 5, 8, 10, 5, 2, 0, -2, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, -5, -8, -10, -5, -8, -10, -12, -15, -10, -8, -5, -2, 0, -2, -5, -8, -10, -12, -15, -10, -5, -10, -10, -15, -20, -18, -15, -12, -10, -15, -18, -20, -22, -25, -20, -18, -20, -25, -30, -35, -40, -50, -45, -55, -60, -65, -70, -65, -75, -70]
+                // "priceForecast": [...] // ODSTRANĚNO
             },
             "sp500": { // Pro S&P 500 použijeme ETF SPY
                 "apiConfig": {
@@ -226,9 +226,9 @@
                     "probabilityText": "50% pohybu do strany",
                     "forecast": [50, 52, 50, 48, 50, 51, 53, 52, 50, 49, 48, 47, 48, 50, 51, 50, 49, 48, 50, 52, 53, 51, 50, 48, 47, 48, 50, 51, 50, 49]
                 },
-                "cot": { "bias": "Neutrální", "score": 0 },
-                "history": [-20, -15, -10, -12, -8, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -10, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, 0, 2, 5, 8, 10, 12, 10, 8, 5, 2, 0, 2, 5, 8, 10, 12, 15, 10, 8, 5, 2, 0, 5, 8, 10, 12, 15, 18, 20, 15, 10, 8, 5, 2, 5, 8, 10, 12, 15, 12, 10, 14, 18, 20, 15, 12, 10, 8, 10, 12, 10, 15, 20, 25, 30, 25, 35, 40, 45, 50, 45, 48, 52, 50],
-                "priceForecast": [5240, 5242, 5240, 5238, 5240, 5241, 5243, 5242, 5240, 5239, 5238, 5237, 5238, 5240, 5241, 5240, 5239, 5238, 5240, 5242, 5243, 5241, 5240, 5238, 5237, 5238, 5240, 5241, 5240, 5239]
+                "cotConfig": { "symbol": "SP500" },
+                "history": [-20, -15, -10, -12, -8, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -10, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, 0, 2, 5, 8, 10, 12, 10, 8, 5, 2, 0, 2, 5, 8, 10, 12, 15, 10, 8, 5, 2, 0, 5, 8, 10, 12, 15, 18, 20, 15, 10, 8, 5, 2, 5, 8, 10, 12, 15, 12, 10, 14, 18, 20, 15, 12, 10, 8, 10, 12, 10, 15, 20, 25, 30, 25, 35, 40, 45, 50, 45, 48, 52, 50]
+                // "priceForecast": [...] // ODSTRANĚNO
             }
         };
 
@@ -265,6 +265,93 @@
                 errorOverlay.classList.add('hidden');
             }
         }
+
+        /**
+         * NOVÁ FUNKCE: Načte reálná COT data
+         */
+        async function fetchRealCotData(apiConfig) {
+            const userApiKey = localStorage.getItem(API_KEY_STORAGE);
+            if (!userApiKey) {
+                // showError je voláno v hlavní funkci, není třeba zde
+                return null;
+            }
+
+            // Použijeme symbol z cotConfig
+            const url = `https://www.alphavantage.co/query?function=COMMITMENTS_OF_TRADERS&symbol=${apiConfig.symbol}&outputsize=compact&apikey=${userApiKey}`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Chyba sítě: ${response.statusText}`);
+                
+                const data = await response.json();
+
+                if (data['Error Message'] || data['Note']) {
+                    let message = data['Error Message'] || data['Note'];
+                    console.error('Chyba API (COT):', message);
+                    let userMessage = message;
+                    if (message.includes("API call frequency")) {
+                        userMessage = "Překročili jste limit API pro COT data. Zkuste to prosím znovu za minutu.";
+                    }
+                    if (message.includes("Invalid API key")) {
+                        userMessage = "Vložený API klíč je neplatný. Zkontrolujte jej prosím.";
+                    }
+                    showError(`Chyba API (COT): ${userMessage}`);
+                    return null;
+                }
+
+                if (!data.data) {
+                    throw new Error("Formát COT dat z API není správný.");
+                }
+
+                // Máme data, spočítáme skóre
+                return calculateCotScore(data.data);
+
+            } catch (error) {
+                console.error('Selhání načítání COT dat:', error);
+                showError(`Nepodařilo se načíst reálná COT data: ${error.message}.`);
+                return null;
+            }
+        }
+
+        /**
+         * NOVÁ FUNKCE: Vypočítá skóre z COT dat (na základě 100 reportů)
+         */
+        function calculateCotScore(reports) {
+            if (!reports || reports.length === 0) {
+                return { bias: "Nedostatek dat", score: 0 };
+            }
+
+            // 1. Spočítáme netto pozice pro "Non-Commercials" (fondy)
+            const netPositions = reports.map(r => 
+                parseFloat(r.non_commercial_long_all) - parseFloat(r.non_commercial_short_all)
+            );
+
+            // 2. Najdeme min/max za posledních 100 reportů
+            const currentNetPosition = netPositions[0]; // První je nejnovější
+            const minNet = Math.min(...netPositions);
+            const maxNet = Math.max(...netPositions);
+
+            // 3. Normalizujeme aktuální pozici (0 až 1)
+            const range = maxNet - minNet;
+            let normalized = 0.5; // Neutrál pokud je range 0
+            if (range > 0) {
+                normalized = (currentNetPosition - minNet) / range;
+            }
+
+            // 4. Převedeme na skóre (-40 až +40), podobně jako v simulaci
+            const score = Math.round((normalized * 80) - 40);
+
+            // 5. Určíme slovní bias
+            let bias;
+            if (score > 20) bias = "Extrém. Nákupy";
+            else if (score > 5) bias = "Nákupy";
+            else if (score < -20) bias = "Extrém. Prodeje";
+            else if (score < -5) bias = "Prodeje";
+            else bias = "Neutrální";
+
+            return { bias, score };
+        }
+
 
         /**
          * Načte reálná cenová data z Alpha Vantage API
@@ -388,8 +475,8 @@
                     datasets: [
                         { label: 'Skóre (Simul.)', data: [], yAxisID: 'y-score' },
                         { label: 'Predikce Skóre (Simul.)', data: [], yAxisID: 'y-score' },
-                        { label: 'Cena (Reálná)', data: [], yAxisID: 'y-price' },
-                        { label: 'Predikce Ceny (Simul.)', data: [], yAxisID: 'y-price' }
+                        { label: 'Cena (Reálná)', data: [], yAxisID: 'y-price' }
+                        // ODSTRANĚNO: { label: 'Predikce Ceny (Simul.)', ... }
                     ]
                 },
                 options: {
@@ -419,7 +506,9 @@
                 }
             });
             
-            const [scoreDS, scoreForecastDS, priceDS, priceForecastDS] = historyChart.data.datasets;
+            // Aplikace stylů, které byly v neinicializovaném datasetu
+            // ODSTRANĚNO: priceForecastDS
+            const [scoreDS, scoreForecastDS, priceDS] = historyChart.data.datasets;
             
             scoreDS.borderColor = 'rgb(59, 130, 246)';
             scoreDS.borderWidth = 3;
@@ -440,18 +529,14 @@
             priceDS.tension = 0.1;
             priceDS.pointRadius = 0;
 
-            priceForecastDS.borderColor = 'rgba(234, 179, 8, 0.7)';
-            priceForecastDS.borderWidth = 2;
-            priceForecastDS.fill = false;
-            priceForecastDS.tension = 0.1;
-            priceForecastDS.pointRadius = 0;
-            priceForecastDS.borderDash = [5, 5];
+            // ODSTRANĚNO: Styly pro priceForecastDS
         }
 
         /**
          * Funkce pro aktualizaci grafu (kombinuje reálná a simulovaná data)
          */
-        function updateChart(simScoreHistory, simScoreForecast, realPriceHistory, simPriceForecast, realDateLabels) {
+        // ODSTRANĚNO: simPriceForecast
+        function updateChart(simScoreHistory, simScoreForecast, realPriceHistory, realDateLabels) {
             // (Beze změny)
             if (!realDateLabels || realDateLabels.length === 0) {
                 console.error("Chybí reálné popisky dat pro graf.");
@@ -467,20 +552,20 @@
                 ...simScoreForecast
             ];
 
+            // --- Data pro Cenu (Reálná) ---
             const priceDisplay = [...realPriceHistory, ...Array(30).fill(null)];
-            const priceForecastDisplay = [
-                ...Array(realPriceHistory.length - 1).fill(null),
-                realPriceHistory[realPriceHistory.length - 1],
-                ...simPriceForecast
-            ];
+            // ODSTRANĚNO: priceForecastDisplay
 
+            // Vložení dat do grafu
             historyChart.data.labels = [...realDateLabels, ...forecastDates];
             historyChart.data.datasets[0].data = scoreHistoryDisplay;
             historyChart.data.datasets[1].data = scoreForecastDisplay;
             historyChart.data.datasets[2].data = priceDisplay;
-            historyChart.data.datasets[3].data = priceForecastDisplay;
+            // ODSTRANĚNO: historyChart.data.datasets[3].data = priceForecastDisplay;
             
-            const allPrices = [...realPriceHistory, ...simPriceForecast].filter(p => p !== null);
+            // --- Dynamické nastavení osy Y pro Cenu ---
+            // ODSTRANĚNO: simPriceForecast
+            const allPrices = [...realPriceHistory].filter(p => p !== null);
             const minPrice = Math.min(...allPrices);
             const maxPrice = Math.max(...allPrices);
             const pricePadding = (maxPrice - minPrice) * 0.05; 
@@ -527,17 +612,18 @@
         /**
          * Funkce pro aktualizaci karet komponent
          */
-        function updateCards(simulatedData, realMomentum) {
-            // (Beze změny)
+        // PŘIDÁNO: realCotData
+        function updateCards(simulatedData, realMomentum, realCotData) {
+            // Sezonalita (Simulovaná)
             document.getElementById('seasonal-bias').textContent = simulatedData.seasonal.bias;
             document.getElementById('seasonal-score').textContent = `Příspěvek ke skóre: ${simulatedData.seasonal.score}`;
             document.getElementById('seasonal-probability').textContent = simulatedData.seasonal.probabilityText;
 
-            document.getElementById('cot-bias').textContent = simulatedData.cot.bias;
-            document.getElementById('cot-score').textContent = `Příspěvek ke skóre: ${simulatedData.cot.score}`;
+            // COT Report (Reálné)
+            document.getElementById('cot-bias').textContent = realCotData.bias;
+            document.getElementById('cot-score').textContent = `Příspěvek ke skóre: ${realCotData.score}`;
             
-            document.getElementById('momentum-bias').textContent = realMomentum.bias;
-            document.getElementById('momentum-score').textContent = `Příspěvek ke skóre: ${realMomentum.score}`;
+            // Momentum (Reálné)
         }
 
         /**
@@ -548,6 +634,14 @@
                 loadingOverlay.classList.remove('hidden');
             }
             
+            // Ověření API klíče zde, abychom nevolali zbytečně
+            const userApiKey = localStorage.getItem(API_KEY_STORAGE);
+            if (!userApiKey) {
+                showError("Chybí API klíč. Vložte prosím svůj klíč do pole výše a uložte jej.");
+                if (loadingOverlay) loadingOverlay.classList.add('hidden');
+                return;
+            }
+
             try {
                 const simulatedData = mockMarketData[marketKey];
                 if (!simulatedData) {
@@ -556,22 +650,26 @@
 
                 // 1. Načtení reálných dat o ceně
                 const realData = await fetchRealPriceData(simulatedData.apiConfig);
-                if (!realData) {
-                    return; 
+                // 2. Načtení reálných COT dat
+                const realCotData = await fetchRealCotData(simulatedData.cotConfig);
+
+                // Kontrola, zda obě volání proběhla úspěšně
+                if (!realData || !realCotData) {
+                    return; // Chyba byla již oznámena ve fetch funkcích
                 }
 
-                // 2. Výpočet reálného momentu
+                // 3. Výpočet reálného momentu
                 const realMomentum = calculateMomentum(realData.priceHistory);
 
-                // 3. Aktualizace karet
-                updateCards(simulatedData, realMomentum);
+                // 4. Aktualizace karet
+                updateCards(simulatedData, realMomentum, realCotData);
 
-                // 4. Aktualizace hlavního grafu
+                // 5. Aktualizace hlavního grafu
+                // ODSTRANĚNO: simulatedData.priceForecast
                 updateChart(
                     simulatedData.history,
                     simulatedData.seasonal.forecast,
                     realData.priceHistory,
-                    simulatedData.priceForecast,
                     realData.dateLabels
                 );
 
@@ -652,5 +750,6 @@
     </script>
 </body>
 </html>
+
 
 
