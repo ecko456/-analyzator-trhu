@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="cs" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyzátor Tržního Biasu (Demo)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js - pro grafy -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Ikony (Ionicons) -->
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0c0a09; /* Tmavší pozadí */
+            color: #e2e8f0;
+        }
+        .dark .bg-gray-800 { background-color: #1e293b; }
+        .dark .bg-gray-900 { background-color: #111827; }
+        .dark .text-gray-300 { color: #d1d5db; }
+        .dark .text-gray-400 { color: #9ca3af; }
+        
+        /* Přizpůsobení pro Chart.js v tmavém režimu */
+        .chart-container {
+            position: relative;
+            height: 320px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+    </style>
+    <script>
+        // Nastavení Tailwindu pro tmavý režim
+        tailwind.config = {
+            darkMode: 'class', // Povolí tmavý režim
+        }
+    </script>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-white">Analyzátor Tržního Biasu <span class="text-blue-500">(Demo)</span></h1>
+        </header>
+
+        <!-- Výběr trhu -->
+        <div class="mb-6">
+            <label for="market-select" class="block text-sm font-medium text-gray-400 mb-2">Vyberte trh:</label>
+            <select id="market-select" class="w-full bg-gray-800 border border-gray-700 text-white text-lg rounded-lg focus:ring-blue-500 focus:border-blue-500 p-3">
+                <option value="eurusd">EUR/USD</option>
+                <option value="gold">Zlato (Gold)</option>
+                <option value="sp500">S&P 500 (Index)</option>
+                <option value="crypto">Kryptoměny (Index)</option>
+            </select>
+        </div>
+
+        <!-- Hlavní Graf: Historie a Predikce -->
+        <div class="bg-gray-900 rounded-xl p-4 md:p-6">
+            <h3 class="text-lg font-semibold text-gray-300 mb-4">Vývoj Celkového Skóre (90 dní historie + 30 dní predikce)</h3>
+            <div class="chart-container">
+                <canvas id="historyChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Detailní komponenty skóre -->
+        <h3 class="text-lg font-semibold text-gray-300 mt-8 mb-4">Komponenty Skóre:</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <!-- Karta 1: Sezonalita & Predikce -->
+            <div class="bg-gray-700 p-5 rounded-lg shadow-lg">
+                <div class="flex items-center mb-2">
+                    <ion-icon name="calendar-outline" class="text-blue-400 text-2xl mr-3"></ion-icon>
+                    <h4 class="text-lg font-semibold">Sezonalita & Predikce</h4>
+                </div>
+                <p class="text-xs text-gray-400 -mt-2 mb-2">(průměr za 2 roky)</p>
+                <p id="seasonal-bias" class="text-2xl font-bold">&mdash;</p>
+                <p id="seasonal-score" class="text-sm text-gray-400">Příspěvek ke skóre: 0</p>
+                <!-- Pravděpodobnost -->
+                <div class="border-t border-gray-600 mt-3 pt-3">
+                    <p class="text-sm text-gray-300">Pravděpodobný vývoj:</p>
+                    <p id="seasonal-probability" class="text-lg font-semibold text-blue-300">&mdash;</p>
+                </div>
+            </div>
+            
+            <!-- Karta 2: COT Report -->
+            <div class="bg-gray-700 p-5 rounded-lg shadow-lg">
+                <div class="flex items-center mb-2">
+                    <ion-icon name="people-circle-outline" class="text-green-400 text-2xl mr-3"></ion-icon>
+                    <h4 class="text-lg font-semibold">COT Report</h4>
+                </div>
+                <p class="text-xs text-gray-400 -mt-2 mb-2">(Pozice velkých fondů)</p>
+                <p id="cot-bias" class="text-2xl font-bold">&mdash;</p>
+                <p id="cot-score" class="text-sm text-gray-400">Příspěvek ke skóre: 0</p>
+            </div>
+            
+            <!-- Karta 3: Momentum -->
+            <div class="bg-gray-700 p-5 rounded-lg shadow-lg">
+                <div class="flex items-center mb-2">
+                    <ion-icon name="trending-up-outline" class="text-orange-400 text-2xl mr-3"></ion-icon>
+                    <h4 class="text-lg font-semibold">Momentum</h4>
+                </div>
+                <p class="text-xs text-gray-400 -mt-2 mb-2">(Aktuální síla trhu)</p>
+                <p id="momentum-bias" class="text-2xl font-bold">&mdash;</p>
+                <p id="momentum-score" class="text-sm text-gray-400">Příspěvek ke skóre: 0</p>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        // --- Simulovaná Databáze ---
+        // V reálné aplikaci by tato data přicházela z API.
+        // Simulujeme 90 dní historie a 30 dní predikce.
+        const mockMarketData = {
+            "eurusd": {
+                "seasonal": { 
+                    "bias": "Býčí", 
+                    "score": 30, 
+                    "probabilityText": "75% pravděpodobnost růstu",
+                    // 30 dní budoucí predikce
+                    "forecast": [90, 92, 95, 93, 96, 98, 100, 97, 95, 98, 100, 102, 105, 103, 100, 98, 100, 102, 105, 107, 110, 108, 105, 107, 105, 103, 100, 98, 95, 92] 
+                },
+                "cot": { "bias": "Extrém. Nákupy", "score": 40 },
+                "momentum": { "bias": "Růstové", "score": 20 },
+                // 90 dní historie skóre
+                "history": [-10, -5, 0, -2, 5, 8, 10, 5, 8, 12, 10, 15, 12, 10, 8, 5, 10, 12, 15, 18, 20, 22, 25, 20, 22, 24, 20, 18, 20, 25, 22, 20, 18, 15, 12, 10, 8, 10, 12, 15, 10, 12, 10, 15, 18, 20, 25, 22, 20, 15, 10, 12, 15, 18, 20, 22, 25, 28, 30, 28, 10, 15, 20, 25, 30, 25, 30, 32, 28, 30, 33, 30, 32, 35, 38, 40, 35, 40, 50, 45, 55, 60, 70, 65, 75, 80, 85, 80, 88, 90]
+            },
+            "gold": {
+                "seasonal": { 
+                    "bias": "Medvědí", 
+                    "score": -20,
+                    "probabilityText": "65% pravděpodobnost poklesu",
+                    "forecast": [-70, -72, -75, -73, -70, -68, -70, -75, -78, -80, -82, -85, -83, -80, -78, -80, -82, -80, -75, -70, -68, -65, -68, -70, -72, -75, -78, -80, -82, -80]
+                },
+                "cot": { "bias": "Extrém. Prodeje", "score": -40 },
+                "momentum": { "bias": "Klesající", "score": -10 },
+                "history": [20, 15, 10, 12, 8, 5, 0, -2, 5, 0, -5, -2, 0, 5, 8, 10, 5, 2, 0, -2, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, -5, -8, -10, -5, -8, -10, -12, -15, -10, -8, -5, -2, 0, -2, -5, -8, -10, -12, -15, -10, -5, -10, -10, -15, -20, -18, -15, -12, -10, -15, -18, -20, -22, -25, -20, -18, -20, -25, -30, -35, -40, -50, -45, -55, -60, -65, -70, -65, -75, -70]
+            },
+            "sp500": {
+                "seasonal": { 
+                    "bias": "Neutrální", 
+                    "score": 0,
+                    "probabilityText": "50% pravděpodobnost pohybu do strany",
+                    "forecast": [50, 52, 50, 48, 50, 51, 53, 52, 50, 49, 48, 47, 48, 50, 51, 50, 49, 48, 50, 52, 53, 51, 50, 48, 47, 48, 50, 51, 50, 49]
+                },
+                "cot": { "bias": "Neutrální", "score": 0 },
+                "momentum": { "bias": "Silně Růstové", "score": 50 },
+                "history": [-20, -15, -10, -12, -8, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -10, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, 0, 2, 5, 8, 10, 12, 10, 8, 5, 2, 0, 2, 5, 8, 10, 12, 15, 10, 8, 5, 2, 0, 5, 8, 10, 12, 15, 18, 20, 15, 10, 8, 5, 2, 5, 8, 10, 12, 15, 12, 10, 14, 18, 20, 15, 12, 10, 8, 10, 12, 10, 15, 20, 25, 30, 25, 35, 40, 45, 50, 45, 48, 52, 50]
+            },
+            "crypto": {
+                "seasonal": { 
+                    "bias": "Býčí", 
+                    "score": 20,
+                    "probabilityText": "60% pravděpodobnost růstu",
+                    "forecast": [40, 42, 45, 43, 46, 48, 50, 52, 55, 53, 50, 52, 55, 58, 60, 58, 55, 57, 60, 62, 65, 63, 60, 62, 65, 68, 70, 68, 65, 63]
+                },
+                "cot": { "bias": "Extrém. Nákupy", "score": 30 },
+                "momentum": { "bias": "Slabé", "score": -10 },
+                "history": [5, 0, -5, 0, 5, 10, 15, 10, 5, 0, 5, 10, 12, 8, 5, 10, 15, 12, 10, 8, 10, 15, 20, 15, 10, 5, 0, 5, 10, 15, 12, 10, 8, 10, 12, 15, 18, 20, 15, 12, 10, 8, 5, 10, 15, 12, 10, 5, 0, 5, 10, 15, 18, 20, 25, 20, 15, 10, 5, 10, 10, 12, 15, 10, 8, 5, 10, 15, 12, 10, 5, 8, 10, 12, 15, 20, 5, 10, 15, 20, 15, 25, 30, 35, 40, 30, 35, 45, 42, 40]
+            }
+        };
+
+        // --- Globální proměnná pro graf ---
+        let historyChart = null;
+
+        /**
+         * Vytvoří popisky osy X (90 dní historie + 30 dní predikce)
+         */
+        function createDateLabels() {
+            const labels = [];
+            // Použijeme pevné datum pro konzistenci dema
+            const today = new Date("2025-10-27T19:45:00"); 
+            
+            // 90 dní historie
+            for (let i = 89; i >= 0; i--) { 
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                labels.push(`${date.getDate()}.${date.getMonth() + 1}.`);
+            }
+            // 30 dní predikce
+            for (let i = 1; i <= 30; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                labels.push(`${date.getDate()}.${date.getMonth() + 1}.`);
+            }
+            return labels;
+        }
+
+
+        /**
+         * Inicializuje hlavní graf
+         */
+        function initializeChart() {
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            
+            // Gradient pro hlavní čáru
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.8)'); // Modrá
+            gradient.addColorStop(0.5, 'rgba(59, 130, 246, 0.4)');
+            gradient.addColorStop(1, 'rgba(17, 24, 39, 0.0)'); // Průhledná na konci
+
+            historyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: createDateLabels(),
+                    datasets: [
+                        {
+                            label: 'Skóre (90 dní)',
+                            data: [], // Bude naplněno v updateChart
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: gradient,
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.1,
+                            pointRadius: 0,
+                        },
+                        {
+                            label: 'Predikce (30 dní)',
+                            data: [], // Bude naplněno v updateChart
+                            borderColor: 'rgba(96, 165, 250, 0.7)', // Světlejší modrá
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            borderDash: [5, 5] // Šrafování
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: -120, // Rozšířeno z -100
+                            max: 120, // Rozšířeno ze 100
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: '#374151' }
+                        },
+                        x: {
+                            ticks: { 
+                                color: '#9ca3af',
+                                maxTicksLimit: 12 // Omezí počet popisků na ose X
+                            },
+                            grid: { color: '#374151' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#d1d5db' }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        /**
+         * Funkce pro aktualizaci grafu
+         */
+        function updateChart(market) {
+            const historyData = market.history;
+            const forecastData = market.seasonal.forecast;
+
+            // Data pro graf: 90 historických hodnot + 30 prázdných
+            const historyDisplay = [...historyData, ...Array(30).fill(null)];
+            
+            // Data pro predikci: 89 prázdných, 1 poslední historický bod (pro napojení), 30 budoucích
+            const forecastDisplay = [
+                ...Array(historyData.length - 1).fill(null), 
+                historyData[historyData.length - 1], 
+                ...forecastData
+            ];
+
+            historyChart.data.datasets[0].data = historyDisplay;
+            historyChart.data.datasets[1].data = forecastDisplay;
+            
+            // Určení barvy grafu
+            const lastScore = historyData[historyData.length - 1];
+            const mainColor = lastScore >= 0 ? 'rgb(59, 130, 246)' : 'rgb(239, 68, 68)'; // Modrá pro býčí, červená pro medvědí
+            const gradient = historyChart.ctx.createLinearGradient(0, 0, 0, 400);
+            
+            if (lastScore >= 0) {
+                gradient.addColorStop(0, 'rgba(59, 130, 246, 0.8)');
+                gradient.addColorStop(1, 'rgba(17, 24, 39, 0.0)');
+            } else {
+                gradient.addColorStop(0, 'rgba(239, 68, 68, 0.8)');
+                gradient.addColorStop(1, 'rgba(17, 24, 39, 0.0)');
+            }
+
+            historyChart.data.datasets[0].borderColor = mainColor;
+            historyChart.data.datasets[0].backgroundColor = gradient;
+            
+            historyChart.update('none'); // 'none' pro plynulou aktualizaci bez animace
+        }
+
+        /**
+         * Funkce pro aktualizaci všech prvků na stránce
+         */
+        function updateDashboard(marketKey) {
+            const market = mockMarketData[marketKey];
+            if (!market) return;
+
+            // 1. Aktualizace karet komponent
+            // Sezonalita
+            document.getElementById('seasonal-bias').textContent = market.seasonal.bias;
+            document.getElementById('seasonal-score').textContent = `Příspěvek ke skóre: ${market.seasonal.score}`;
+            document.getElementById('seasonal-probability').textContent = market.seasonal.probabilityText;
+
+            // COT Report
+            document.getElementById('cot-bias').textContent = market.cot.bias;
+            document.getElementById('cot-score').textContent = `Příspěvek ke skóre: ${market.cot.score}`;
+            
+            // Momentum
+            document.getElementById('momentum-bias').textContent = market.momentum.bias;
+            document.getElementById('momentum-score').textContent = `Příspěvek ke skóre: ${market.momentum.score}`;
+
+            // 2. Aktualizace hlavního grafu
+            updateChart(market);
+        }
+
+        // --- Inicializace aplikace ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const selectElement = document.getElementById('market-select');
+            
+            // Inicializace grafu
+            initializeChart();
+
+            // První spuštění pro výchozí trh
+            updateDashboard(selectElement.value);
+
+            // Přidání listeneru na změnu trhu
+            selectElement.addEventListener('change', (e) => {
+                updateDashboard(e.target.value);
+            });
+        });
+
+    </script>
+</body>
+</html>
+
