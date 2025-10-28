@@ -200,9 +200,10 @@
             },
             "gold": { // Pro zlato použijeme XAU/USD
                 "apiConfig": {
-                    "function": "FX_DAILY",
-                    "from_symbol": "XAU",
-                    "to_symbol": "USD"
+                    // OPRAVA: Změna funkce a parametrů pro zlato
+                    "function": "PHYSICAL_CURRENCY_DAILY", 
+                    "symbol": "XAU",
+                    "market": "USD"
                 },
                 "seasonal": { 
                     "bias": "Medvědí", 
@@ -280,6 +281,9 @@
             let url;
             if (apiConfig.function === 'FX_DAILY') {
                 url = `https://www.alphavantage.co/query?function=${apiConfig.function}&from_symbol=${apiConfig.from_symbol}&to_symbol=${apiConfig.to_symbol}&outputsize=compact&apikey=${userApiKey}`;
+            } else if (apiConfig.function === 'PHYSICAL_CURRENCY_DAILY') {
+                // NOVÁ VĚTEV: Pro zlato
+                url = `https://www.alphavantage.co/query?function=${apiConfig.function}&symbol=${apiConfig.symbol}&market=${apiConfig.market}&outputsize=compact&apikey=${userApiKey}`;
             } else { // TIME_SERIES_DAILY
                 url = `https://www.alphavantage.co/query?function=${apiConfig.function}&symbol=${apiConfig.symbol}&outputsize=compact&apikey=${userApiKey}`;
             }
@@ -308,7 +312,12 @@
                 }
 
                 // Zpracování dat
-                const timeSeriesKey = apiConfig.function === 'FX_DAILY' ? 'Time Series FX (Daily)' : 'Time Series (Daily)';
+                // OPRAVA: Rozšíření o nový klíč pro zlato
+                const timeSeriesKey = 
+                    apiConfig.function === 'FX_DAILY' ? 'Time Series FX (Daily)' :
+                    apiConfig.function === 'PHYSICAL_CURRENCY_DAILY' ? 'Time Series (Physical Currency Daily)' : 
+                    'Time Series (Daily)';
+                
                 const timeSeries = data[timeSeriesKey];
 
                 if (!timeSeries) {
@@ -643,4 +652,5 @@
     </script>
 </body>
 </html>
+
 
