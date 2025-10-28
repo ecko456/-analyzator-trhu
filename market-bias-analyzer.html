@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analyzátor Tržního Biasu (Demo)</title>
+    <title>Analyzátor Tržního Biasu (Hybrid)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js - pro grafy -->
@@ -22,7 +22,6 @@
         .dark .text-gray-300 { color: #d1d5db; }
         .dark .text-gray-400 { color: #9ca3af; }
         
-        /* Přizpůsobení pro Chart.js v tmavém režimu */
         .chart-container {
             position: relative;
             height: 320px;
@@ -32,34 +31,89 @@
                 height: 400px;
             }
         }
+        /* Loader */
+        #loading-overlay, #error-overlay {
+            transition: opacity 0.3s ease-in-out;
+        }
+        /* Animace otáčení pro ikonu loaderu */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .loader-icon {
+            animation: spin 1s linear infinite;
+        }
+        /* Zobrazí input pro API klíč jako heslo, ale při focusu jako text */
+        #api-key-input:not(:placeholder-shown) {
+            font-family: 'Inter', sans-serif;
+        }
+        #api-key-input::placeholder {
+             font-family: 'Inter', sans-serif;
+        }
+        #api-key-input:focus {
+            font-family: 'Inter', sans-serif;
+        }
     </style>
     <script>
-        // Nastavení Tailwindu pro tmavý režim
-        tailwind.config = {
-            darkMode: 'class', // Povolí tmavý režim
-        }
+        tailwind.config = { darkMode: 'class' }
     </script>
 </head>
 <body class="p-4 md:p-8">
+
+    <!-- Překryvná vrstva pro načítání -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-75 flex-col flex items-center justify-center z-50 hidden">
+        <ion-icon name="sync-outline" class="text-white text-6xl loader-icon mb-4"></ion-icon>
+        <div class="text-white text-xl font-semibold">Načítám reálná data...</div>
+        <div class="text-gray-400 text-sm mt-2">To může chvíli trvat, Alpha Vantage API je sdílené.</div>
+    </div>
+
+    <!-- Překryvná vrstva pro CHYBU (Nahrazuje alert()) -->
+    <div id="error-overlay" class="fixed inset-0 bg-black bg-opacity-75 flex-col flex items-center justify-center z-50 hidden">
+        <div class="bg-red-800 border-2 border-red-600 rounded-lg p-6 md:p-8 shadow-xl max-w-sm mx-auto text-white w-11/12">
+             <div class="flex items-center mb-4">
+                 <ion-icon name="warning-outline" class="text-yellow-300 text-5xl mr-4"></ion-icon>
+                 <h2 class="text-2xl font-bold">Chyba Načítání</h2>
+             </div>
+             <p id="error-message" class="text-gray-200 mb-6">Zde se objeví chybová zpráva.</p>
+             <button onclick="hideError()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                 Rozumím
+             </button>
+        </div>
+    </div>
+
+
     <div class="max-w-4xl mx-auto">
         <header class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl md:text-3xl font-bold text-white">Analyzátor Tržního Biasu <span class="text-blue-500">(Demo)</span></h1>
+            <h1 class="text-2xl md:text-3xl font-bold text-white">Analyzátor Tržního Biasu <span class="text-blue-500">(Hybrid)</span></h1>
         </header>
+
+        <!-- NOVÁ SEKCE: API Klíč Input -->
+        <div class="mb-6 bg-gray-800 rounded-lg p-4 border border-blue-700">
+            <label for="api-key-input" class="block text-sm font-medium text-gray-400 mb-2">Alpha Vantage API Klíč:</label>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <!-- Použijeme type="password" aby byl klíč skrytý, dokud se neupravuje -->
+                <input type="password" id="api-key-input" onfocus="this.type='text'" onblur="this.type='password'" class="flex-grow w-full bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-blue-500 focus:border-blue-500 p-3" placeholder="Sem vložte svůj API klíč">
+                <button id="save-api-key-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-5 rounded-lg transition-colors whitespace-nowrap">
+                    Uložit klíč
+                </button>
+            </div>
+            <span id="api-key-status" class="text-xs text-gray-500 mt-2 block"></span>
+            <p class="text-xs text-gray-400 mt-2">Klíč je vyžadován pro načtení reálných cen. Je uložen pouze ve vašem prohlížeči (localStorage) a nikam se neodesílá. <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">Získejte zdarma klíč zde.</a></p>
+        </div>
 
         <!-- Výběr trhu -->
         <div class="mb-6">
             <label for="market-select" class="block text-sm font-medium text-gray-400 mb-2">Vyberte trh:</label>
             <select id="market-select" class="w-full bg-gray-800 border border-gray-700 text-white text-lg rounded-lg focus:ring-blue-500 focus:border-blue-500 p-3">
                 <option value="eurusd">EUR/USD</option>
-                <option value="gold">Zlato (Gold)</option>
-                <option value="sp500">S&P 500 (Index)</option>
-                <option value="crypto">Kryptoměny (Index)</option>
+                <option value="gold">Zlato (XAU/USD)</option>
+                <option value="sp500">S&P 500 (SPY)</option>
             </select>
         </div>
 
         <!-- Hlavní Graf: Historie a Predikce -->
         <div class="bg-gray-900 rounded-xl p-4 md:p-6">
-            <h3 class="text-lg font-semibold text-gray-300 mb-4">Vývoj Celkového Skóre (90 dní historie + 30 dní predikce)</h3>
+            <h3 class="text-lg font-semibold text-gray-300 mb-4">Vývoj Skóre (Simul.) vs. Cena (Reálná)</h3>
             <div class="chart-container">
                 <canvas id="historyChart"></canvas>
             </div>
@@ -69,67 +123,87 @@
         <h3 class="text-lg font-semibold text-gray-300 mt-8 mb-4">Komponenty Skóre:</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            <!-- Karta 1: Sezonalita & Predikce -->
+            <!-- Karta 1: Sezonalita (Simulovaná) -->
             <div class="bg-gray-700 p-5 rounded-lg shadow-lg">
                 <div class="flex items-center mb-2">
                     <ion-icon name="calendar-outline" class="text-blue-400 text-2xl mr-3"></ion-icon>
-                    <h4 class="text-lg font-semibold">Sezonalita & Predikce</h4>
+                    <h4 class="text-lg font-semibold">Sezonalita <span class="text-xs text-blue-300">(Simul.)</span></h4>
                 </div>
                 <p class="text-xs text-gray-400 -mt-2 mb-2">(průměr za 2 roky)</p>
                 <p id="seasonal-bias" class="text-2xl font-bold">&mdash;</p>
                 <p id="seasonal-score" class="text-sm text-gray-400">Příspěvek ke skóre: 0</p>
-                <!-- Pravděpodobnost -->
                 <div class="border-t border-gray-600 mt-3 pt-3">
                     <p class="text-sm text-gray-300">Pravděpodobný vývoj:</p>
                     <p id="seasonal-probability" class="text-lg font-semibold text-blue-300">&mdash;</p>
                 </div>
             </div>
             
-            <!-- Karta 2: COT Report -->
+            <!-- Karta 2: COT Report (Simulovaný) -->
             <div class="bg-gray-700 p-5 rounded-lg shadow-lg">
                 <div class="flex items-center mb-2">
                     <ion-icon name="people-circle-outline" class="text-green-400 text-2xl mr-3"></ion-icon>
-                    <h4 class="text-lg font-semibold">COT Report</h4>
+                    <h4 class="text-lg font-semibold">COT Report <span class="text-xs text-green-300">(Simul.)</span></h4>
                 </div>
                 <p class="text-xs text-gray-400 -mt-2 mb-2">(Pozice velkých fondů)</p>
                 <p id="cot-bias" class="text-2xl font-bold">&mdash;</p>
                 <p id="cot-score" class="text-sm text-gray-400">Příspěvek ke skóre: 0</p>
             </div>
             
-            <!-- Karta 3: Momentum -->
-            <div class="bg-gray-700 p-5 rounded-lg shadow-lg">
+            <!-- Karta 3: Momentum (REÁLNÉ) -->
+            <div class="bg-gray-700 p-5 rounded-lg shadow-lg border-2 border-orange-500">
                 <div class="flex items-center mb-2">
                     <ion-icon name="trending-up-outline" class="text-orange-400 text-2xl mr-3"></ion-icon>
-                    <h4 class="text-lg font-semibold">Momentum</h4>
+                    <h4 class="text-lg font-semibold">Momentum <span class="text-xs text-orange-300">(Reálné)</span></h4>
                 </div>
-                <p class="text-xs text-gray-400 -mt-2 mb-2">(Aktuální síla trhu)</p>
+                <p class="text-xs text-gray-400 -mt-2 mb-2">(Cena vs 30-denní průměr)</p>
                 <p id="momentum-bias" class="text-2xl font-bold">&mdash;</p>
                 <p id="momentum-score" class="text-sm text-gray-400">Příspěvek ke skóre: 0</p>
             </div>
 
         </div>
 
+        <!-- UPRAVENÝ FOOTER -->
+        <footer class="text-center text-gray-500 mt-10">
+            <p class="text-yellow-500 font-bold text-lg">POZNÁMKA: Tato aplikace vyžaduje pro načtení reálných dat váš vlastní API klíč.</p>
+            <p class="text-gray-400 text-sm">Vložte jej prosím do pole výše. Klíč bude uložen bezpečně pouze ve vašem prohlížeči.</p>
+        </footer>
+
     </div>
 
     <script>
-        // --- Simulovaná Databáze ---
-        // V reálné aplikaci by tato data přicházela z API.
-        // Simulujeme 90 dní historie a 30 dní predikce.
+        // ##################################################################
+        // # API KLÍČ BYL ODSTRANĚN
+        // # Aplikace nyní načítá klíč z localStorage
+        // ##################################################################
+        // const API_KEY = '...'; // ODSTRANĚNO
+        // ##################################################################
+
+
+        // --- Simulovaná Databáze (Pro COT a Sezonalitu) ---
+        // (Beze změny)
         const mockMarketData = {
             "eurusd": {
+                "apiConfig": { 
+                    "function": "FX_DAILY", 
+                    "from_symbol": "EUR", 
+                    "to_symbol": "USD" 
+                },
                 "seasonal": { 
                     "bias": "Býčí", 
                     "score": 30, 
                     "probabilityText": "75% pravděpodobnost růstu",
-                    // 30 dní budoucí predikce
                     "forecast": [90, 92, 95, 93, 96, 98, 100, 97, 95, 98, 100, 102, 105, 103, 100, 98, 100, 102, 105, 107, 110, 108, 105, 107, 105, 103, 100, 98, 95, 92] 
                 },
                 "cot": { "bias": "Extrém. Nákupy", "score": 40 },
-                "momentum": { "bias": "Růstové", "score": 20 },
-                // 90 dní historie skóre
-                "history": [-10, -5, 0, -2, 5, 8, 10, 5, 8, 12, 10, 15, 12, 10, 8, 5, 10, 12, 15, 18, 20, 22, 25, 20, 22, 24, 20, 18, 20, 25, 22, 20, 18, 15, 12, 10, 8, 10, 12, 15, 10, 12, 10, 15, 18, 20, 25, 22, 20, 15, 10, 12, 15, 18, 20, 22, 25, 28, 30, 28, 10, 15, 20, 25, 30, 25, 30, 32, 28, 30, 33, 30, 32, 35, 38, 40, 35, 40, 50, 45, 55, 60, 70, 65, 75, 80, 85, 80, 88, 90]
+                "history": [-10, -5, 0, -2, 5, 8, 10, 5, 8, 12, 10, 15, 12, 10, 8, 5, 10, 12, 15, 18, 20, 22, 25, 20, 22, 24, 20, 18, 20, 25, 22, 20, 18, 15, 12, 10, 8, 10, 12, 15, 10, 12, 10, 15, 18, 20, 25, 22, 20, 15, 10, 12, 15, 18, 20, 22, 25, 28, 30, 28, 10, 15, 20, 25, 30, 25, 30, 32, 28, 30, 33, 30, 32, 35, 38, 40, 35, 40, 50, 45, 55, 60, 70, 65, 75, 80, 85, 80, 88, 90],
+                "priceForecast": [1.126, 1.127, 1.128, 1.127, 1.129, 1.130, 1.132, 1.131, 1.129, 1.131, 1.133, 1.135, 1.138, 1.137, 1.135, 1.134, 1.135, 1.136, 1.138, 1.140, 1.142, 1.141, 1.139, 1.140, 1.139, 1.138, 1.136, 1.135, 1.133, 1.131]
             },
-            "gold": {
+            "gold": { // Pro zlato použijeme XAU/USD
+                "apiConfig": {
+                    "function": "FX_DAILY",
+                    "from_symbol": "XAU",
+                    "to_symbol": "USD"
+                },
                 "seasonal": { 
                     "bias": "Medvědí", 
                     "score": -20,
@@ -137,159 +211,278 @@
                     "forecast": [-70, -72, -75, -73, -70, -68, -70, -75, -78, -80, -82, -85, -83, -80, -78, -80, -82, -80, -75, -70, -68, -65, -68, -70, -72, -75, -78, -80, -82, -80]
                 },
                 "cot": { "bias": "Extrém. Prodeje", "score": -40 },
-                "momentum": { "bias": "Klesající", "score": -10 },
-                "history": [20, 15, 10, 12, 8, 5, 0, -2, 5, 0, -5, -2, 0, 5, 8, 10, 5, 2, 0, -2, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, -5, -8, -10, -5, -8, -10, -12, -15, -10, -8, -5, -2, 0, -2, -5, -8, -10, -12, -15, -10, -5, -10, -10, -15, -20, -18, -15, -12, -10, -15, -18, -20, -22, -25, -20, -18, -20, -25, -30, -35, -40, -50, -45, -55, -60, -65, -70, -65, -75, -70]
+                "history": [20, 15, 10, 12, 8, 5, 0, -2, 5, 0, -5, -2, 0, 5, 8, 10, 5, 2, 0, -2, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, -5, -8, -10, -5, -8, -10, -12, -15, -10, -8, -5, -2, 0, -2, -5, -8, -10, -12, -15, -10, -5, -10, -10, -15, -20, -18, -15, -12, -10, -15, -18, -20, -22, -25, -20, -18, -20, -25, -30, -35, -40, -50, -45, -55, -60, -65, -70, -65, -75, -70],
+                "priceForecast": [2124, 2122, 2115, 2117, 2110, 2108, 2110, 2105, 2098, 2090, 2088, 2085, 2087, 2090, 2092, 2090, 2088, 2090, 2095, 2100, 2102, 2105, 2103, 2100, 2098, 2095, 2092, 2090, 2088, 2090]
             },
-            "sp500": {
+            "sp500": { // Pro S&P 500 použijeme ETF SPY
+                "apiConfig": {
+                    "function": "TIME_SERIES_DAILY",
+                    "symbol": "SPY"
+                },
                 "seasonal": { 
                     "bias": "Neutrální", 
                     "score": 0,
-                    "probabilityText": "50% pravděpodobnost pohybu do strany",
+                    "probabilityText": "50% pohybu do strany",
                     "forecast": [50, 52, 50, 48, 50, 51, 53, 52, 50, 49, 48, 47, 48, 50, 51, 50, 49, 48, 50, 52, 53, 51, 50, 48, 47, 48, 50, 51, 50, 49]
                 },
                 "cot": { "bias": "Neutrální", "score": 0 },
-                "momentum": { "bias": "Silně Růstové", "score": 50 },
-                "history": [-20, -15, -10, -12, -8, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -10, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, 0, 2, 5, 8, 10, 12, 10, 8, 5, 2, 0, 2, 5, 8, 10, 12, 15, 10, 8, 5, 2, 0, 5, 8, 10, 12, 15, 18, 20, 15, 10, 8, 5, 2, 5, 8, 10, 12, 15, 12, 10, 14, 18, 20, 15, 12, 10, 8, 10, 12, 10, 15, 20, 25, 30, 25, 35, 40, 45, 50, 45, 48, 52, 50]
-            },
-            "crypto": {
-                "seasonal": { 
-                    "bias": "Býčí", 
-                    "score": 20,
-                    "probabilityText": "60% pravděpodobnost růstu",
-                    "forecast": [40, 42, 45, 43, 46, 48, 50, 52, 55, 53, 50, 52, 55, 58, 60, 58, 55, 57, 60, 62, 65, 63, 60, 62, 65, 68, 70, 68, 65, 63]
-                },
-                "cot": { "bias": "Extrém. Nákupy", "score": 30 },
-                "momentum": { "bias": "Slabé", "score": -10 },
-                "history": [5, 0, -5, 0, 5, 10, 15, 10, 5, 0, 5, 10, 12, 8, 5, 10, 15, 12, 10, 8, 10, 15, 20, 15, 10, 5, 0, 5, 10, 15, 12, 10, 8, 10, 12, 15, 18, 20, 15, 12, 10, 8, 5, 10, 15, 12, 10, 5, 0, 5, 10, 15, 18, 20, 25, 20, 15, 10, 5, 10, 10, 12, 15, 10, 8, 5, 10, 15, 12, 10, 5, 8, 10, 12, 15, 20, 5, 10, 15, 20, 15, 25, 30, 35, 40, 30, 35, 45, 42, 40]
+                "history": [-20, -15, -10, -12, -8, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -10, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, 0, 2, 5, 8, 10, 12, 10, 8, 5, 2, 0, 2, 5, 8, 10, 12, 15, 10, 8, 5, 2, 0, 5, 8, 10, 12, 15, 18, 20, 15, 10, 8, 5, 2, 5, 8, 10, 12, 15, 12, 10, 14, 18, 20, 15, 12, 10, 8, 10, 12, 10, 15, 20, 25, 30, 25, 35, 40, 45, 50, 45, 48, 52, 50],
+                "priceForecast": [5240, 5242, 5240, 5238, 5240, 5241, 5243, 5242, 5240, 5239, 5238, 5237, 5238, 5240, 5241, 5240, 5239, 5238, 5240, 5242, 5243, 5241, 5240, 5238, 5237, 5238, 5240, 5241, 5240, 5239]
             }
         };
 
-        // --- Globální proměnná pro graf ---
+        // --- Globální proměnné ---
         let historyChart = null;
+        let loadingOverlay;
+        let errorOverlay;
+        let errorMessageElement;
+        // Nové proměnné pro API klíč
+        let apiKeyInput;
+        let saveApiKeyBtn;
+        let apiKeyStatus;
+        
+        const API_KEY_STORAGE = 'alphaVantageApiKey_MarketBias';
 
         /**
-         * Vytvoří popisky osy X (90 dní historie + 30 dní predikce)
+         * Zobrazí modální okno s chybou
+         * @param {string} message - Zpráva, která se má zobrazit
          */
-        function createDateLabels() {
-            const labels = [];
-            // Použijeme pevné datum pro konzistenci dema
-            const today = new Date("2025-10-27T19:45:00"); 
-            
-            // 90 dní historie
-            for (let i = 89; i >= 0; i--) { 
-                const date = new Date(today);
-                date.setDate(today.getDate() - i);
-                labels.push(`${date.getDate()}.${date.getMonth() + 1}.`);
+        function showError(message) {
+            if (errorMessageElement) {
+                errorMessageElement.textContent = message;
             }
-            // 30 dní predikce
-            for (let i = 1; i <= 30; i++) {
-                const date = new Date(today);
-                date.setDate(today.getDate() + i);
-                labels.push(`${date.getDate()}.${date.getMonth() + 1}.`);
+            if (errorOverlay) {
+                errorOverlay.classList.remove('hidden');
             }
-            return labels;
         }
 
+        /**
+         * Skryje modální okno s chybou
+         */
+        function hideError() {
+            if (errorOverlay) {
+                errorOverlay.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Načte reálná cenová data z Alpha Vantage API
+         */
+        async function fetchRealPriceData(apiConfig) {
+            // ZÍSKÁNÍ KLÍČE Z LOCALSTORAGE
+            const userApiKey = localStorage.getItem(API_KEY_STORAGE);
+
+            if (!userApiKey) {
+                showError("Chybí API klíč. Vložte prosím svůj klíč do pole výše a uložte jej.");
+                return null;
+            }
+
+            let url;
+            if (apiConfig.function === 'FX_DAILY') {
+                url = `https://www.alphavantage.co/query?function=${apiConfig.function}&from_symbol=${apiConfig.from_symbol}&to_symbol=${apiConfig.to_symbol}&outputsize=compact&apikey=${userApiKey}`;
+            } else { // TIME_SERIES_DAILY
+                url = `https://www.alphavantage.co/query?function=${apiConfig.function}&symbol=${apiConfig.symbol}&outputsize=compact&apikey=${userApiKey}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Chyba sítě: ${response.statusText}`);
+                }
+                const data = await response.json();
+
+                // Kontrola chybového hlášení nebo limitu API
+                if (data['Error Message'] || data['Note']) {
+                    let message = data['Error Message'] || data['Note'];
+                    console.error('Chyba API:', message);
+                    
+                    let userMessage = message;
+                    if (message.includes("API call frequency")) {
+                        userMessage = "Překročili jste limit API pro Alpha Vantage (obvykle 5 volání za minutu). Zkuste to prosím znovu za minutu.";
+                    }
+                    if (message.includes("Invalid API key")) {
+                        userMessage = "Vložený API klíč je neplatný. Zkontrolujte jej prosím.";
+                    }
+                    showError(`Chyba API: ${userMessage}`);
+                    return null;
+                }
+
+                // Zpracování dat
+                const timeSeriesKey = apiConfig.function === 'FX_DAILY' ? 'Time Series FX (Daily)' : 'Time Series (Daily)';
+                const timeSeries = data[timeSeriesKey];
+
+                if (!timeSeries) {
+                    throw new Error("Formát dat z API není správný.");
+                }
+
+                const priceHistory = [];
+                const dateLabels = [];
+                const entries = Object.entries(timeSeries);
+
+                // Vezmeme posledních 90 dní
+                for (let i = 0; i < 90 && i < entries.length; i++) {
+                    const [date, values] = entries[i];
+                    dateLabels.push(date.substring(5)); // Formát 'MM-DD'
+                    priceHistory.push(parseFloat(values['4. close']));
+                }
+
+                // API vrací data od nejnovějších, pro graf je musíme otočit
+                return {
+                    priceHistory: priceHistory.reverse(),
+                    dateLabels: dateLabels.reverse()
+                };
+
+            } catch (error) {
+                console.error('Selhání načítání dat:', error);
+                showError(`Nepodařilo se načíst reálná data: ${error.message}. Zkontrolujte konzoli (F12) pro více detailů.`);
+                return null;
+            }
+        }
+
+        /**
+         * Vypočítá reálné momentum
+         */
+        function calculateMomentum(priceHistory) {
+            // (Beze změny)
+            if (!priceHistory || priceHistory.length < 30) {
+                return { bias: "Nedostatek dat", score: 0 };
+            }
+
+            const lastPrice = priceHistory[priceHistory.length - 1];
+            const pricesLast30Days = priceHistory.slice(-30);
+            const sma30 = pricesLast30Days.reduce((a, b) => a + b, 0) / pricesLast30Days.length;
+
+            const diffPercent = ((lastPrice - sma30) / sma30) * 100;
+            
+            const score = Math.max(-50, Math.min(50, Math.round(diffPercent * 10))); 
+
+            let bias;
+            if (score > 25) bias = "Silně Býčí";
+            else if (score > 5) bias = "Býčí";
+            else if (score < -25) bias = "Silně Medvědí";
+            else if (score < -5) bias = "Medvědí";
+            else bias = "Neutrální";
+
+            return { bias, score };
+        }
 
         /**
          * Inicializuje hlavní graf
          */
         function initializeChart() {
+            // (Beze změny)
             const ctx = document.getElementById('historyChart').getContext('2d');
-            
-            // Gradient pro hlavní čáru
-            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.8)'); // Modrá
-            gradient.addColorStop(0.5, 'rgba(59, 130, 246, 0.4)');
-            gradient.addColorStop(1, 'rgba(17, 24, 39, 0.0)'); // Průhledná na konci
-
             historyChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: createDateLabels(),
+                    labels: [], 
                     datasets: [
-                        {
-                            label: 'Skóre (90 dní)',
-                            data: [], // Bude naplněno v updateChart
-                            borderColor: 'rgb(59, 130, 246)',
-                            backgroundColor: gradient,
-                            borderWidth: 3,
-                            fill: true,
-                            tension: 0.1,
-                            pointRadius: 0,
-                        },
-                        {
-                            label: 'Predikce (30 dní)',
-                            data: [], // Bude naplněno v updateChart
-                            borderColor: 'rgba(96, 165, 250, 0.7)', // Světlejší modrá
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.1,
-                            pointRadius: 0,
-                            borderDash: [5, 5] // Šrafování
-                        }
+                        { label: 'Skóre (Simul.)', data: [], yAxisID: 'y-score' },
+                        { label: 'Predikce Skóre (Simul.)', data: [], yAxisID: 'y-score' },
+                        { label: 'Cena (Reálná)', data: [], yAxisID: 'y-price' },
+                        { label: 'Predikce Ceny (Simul.)', data: [], yAxisID: 'y-price' }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        y: {
-                            beginAtZero: false,
-                            min: -120, // Rozšířeno z -100
-                            max: 120, // Rozšířeno ze 100
-                            ticks: { color: '#9ca3af' },
-                            grid: { color: '#374151' }
+                        'y-score': {
+                            type: 'linear', position: 'left', min: -120, max: 120,
+                            ticks: { color: '#9ca3af' }, grid: { color: '#374151' },
+                            title: { display: true, text: 'Skóre Biasu (Simul.)', color: '#9ca3af', font: { size: 14 } }
+                        },
+                        'y-price': {
+                            type: 'linear', position: 'right',
+                            ticks: { color: 'rgb(234, 179, 8)' }, grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Cena (Reálná)', color: 'rgb(234, 179, 8)', font: { size: 14 } }
                         },
                         x: {
-                            ticks: { 
-                                color: '#9ca3af',
-                                maxTicksLimit: 12 // Omezí počet popisků na ose X
-                            },
+                            ticks: { color: '#9ca3af', maxTicksLimit: 12 },
                             grid: { color: '#374151' }
                         }
                     },
                     plugins: {
-                        legend: {
-                            labels: { color: '#d1d5db' }
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false
-                        }
+                        legend: { labels: { color: '#d1d5db' } },
+                        tooltip: { mode: 'index', intersect: false, backgroundColor: '#111827', titleColor: '#e2e8f0', bodyColor: '#d1d5db' }
                     },
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
-                    }
+                    interaction: { mode: 'index', intersect: false }
                 }
             });
+            
+            const [scoreDS, scoreForecastDS, priceDS, priceForecastDS] = historyChart.data.datasets;
+            
+            scoreDS.borderColor = 'rgb(59, 130, 246)';
+            scoreDS.borderWidth = 3;
+            scoreDS.fill = true;
+            scoreDS.tension = 0.1;
+            scoreDS.pointRadius = 0;
+
+            scoreForecastDS.borderColor = 'rgba(96, 165, 250, 0.7)';
+            scoreForecastDS.borderWidth = 2;
+            scoreForecastDS.fill = false;
+            scoreForecastDS.tension = 0.1;
+            scoreForecastDS.pointRadius = 0;
+            scoreForecastDS.borderDash = [5, 5];
+
+            priceDS.borderColor = 'rgb(234, 179, 8)';
+            priceDS.borderWidth = 2;
+            priceDS.fill = false;
+            priceDS.tension = 0.1;
+            priceDS.pointRadius = 0;
+
+            priceForecastDS.borderColor = 'rgba(234, 179, 8, 0.7)';
+            priceForecastDS.borderWidth = 2;
+            priceForecastDS.fill = false;
+            priceForecastDS.tension = 0.1;
+            priceForecastDS.pointRadius = 0;
+            priceForecastDS.borderDash = [5, 5];
         }
 
         /**
-         * Funkce pro aktualizaci grafu
+         * Funkce pro aktualizaci grafu (kombinuje reálná a simulovaná data)
          */
-        function updateChart(market) {
-            const historyData = market.history;
-            const forecastData = market.seasonal.forecast;
+        function updateChart(simScoreHistory, simScoreForecast, realPriceHistory, simPriceForecast, realDateLabels) {
+            // (Beze změny)
+            if (!realDateLabels || realDateLabels.length === 0) {
+                console.error("Chybí reálné popisky dat pro graf.");
+                return;
+            }
 
-            // Data pro graf: 90 historických hodnot + 30 prázdných
-            const historyDisplay = [...historyData, ...Array(30).fill(null)];
+            const forecastDates = createDateLabels(realDateLabels[realDateLabels.length - 1], 30);
             
-            // Data pro predikci: 89 prázdných, 1 poslední historický bod (pro napojení), 30 budoucích
-            const forecastDisplay = [
-                ...Array(historyData.length - 1).fill(null), 
-                historyData[historyData.length - 1], 
-                ...forecastData
+            const scoreHistoryDisplay = [...simScoreHistory, ...Array(30).fill(null)];
+            const scoreForecastDisplay = [
+                ...Array(simScoreHistory.length - 1).fill(null), 
+                simScoreHistory[simScoreHistory.length - 1], 
+                ...simScoreForecast
             ];
 
-            historyChart.data.datasets[0].data = historyDisplay;
-            historyChart.data.datasets[1].data = forecastDisplay;
+            const priceDisplay = [...realPriceHistory, ...Array(30).fill(null)];
+            const priceForecastDisplay = [
+                ...Array(realPriceHistory.length - 1).fill(null),
+                realPriceHistory[realPriceHistory.length - 1],
+                ...simPriceForecast
+            ];
+
+            historyChart.data.labels = [...realDateLabels, ...forecastDates];
+            historyChart.data.datasets[0].data = scoreHistoryDisplay;
+            historyChart.data.datasets[1].data = scoreForecastDisplay;
+            historyChart.data.datasets[2].data = priceDisplay;
+            historyChart.data.datasets[3].data = priceForecastDisplay;
             
-            // Určení barvy grafu
-            const lastScore = historyData[historyData.length - 1];
-            const mainColor = lastScore >= 0 ? 'rgb(59, 130, 246)' : 'rgb(239, 68, 68)'; // Modrá pro býčí, červená pro medvědí
-            const gradient = historyChart.ctx.createLinearGradient(0, 0, 0, 400);
+            const allPrices = [...realPriceHistory, ...simPriceForecast].filter(p => p !== null);
+            const minPrice = Math.min(...allPrices);
+            const maxPrice = Math.max(...allPrices);
+            const pricePadding = (maxPrice - minPrice) * 0.05; 
+
+            historyChart.options.scales['y-price'].min = minPrice - pricePadding;
+            historyChart.options.scales['y-price'].max = maxPrice + pricePadding;
+            
+            const lastScore = simScoreHistory[simScoreHistory.length - 1];
+            const mainColor = lastScore >= 0 ? 'rgb(59, 130, 246)' : 'rgb(239, 68, 68)';
+            
+            const gradient = historyChart.ctx.createLinearGradient(0, 0, 0, historyChart.height); 
             
             if (lastScore >= 0) {
                 gradient.addColorStop(0, 'rgba(59, 130, 246, 0.8)');
@@ -302,47 +495,148 @@
             historyChart.data.datasets[0].borderColor = mainColor;
             historyChart.data.datasets[0].backgroundColor = gradient;
             
-            historyChart.update('none'); // 'none' pro plynulou aktualizaci bez animace
+            historyChart.update('none');
         }
 
         /**
-         * Funkce pro aktualizaci všech prvků na stránce
+         * Vytvoří popisky pro budoucí data (predikce)
          */
-        function updateDashboard(marketKey) {
-            const market = mockMarketData[marketKey];
-            if (!market) return;
+        function createDateLabels(lastDateStr, days) {
+            // (Beze změny)
+            const labels = [];
+            const parts = lastDateStr.split('-');
+            const lastDate = new Date(new Date().getFullYear(), parts[0] - 1, parts[1]); 
 
-            // 1. Aktualizace karet komponent
-            // Sezonalita
-            document.getElementById('seasonal-bias').textContent = market.seasonal.bias;
-            document.getElementById('seasonal-score').textContent = `Příspěvek ke skóre: ${market.seasonal.score}`;
-            document.getElementById('seasonal-probability').textContent = market.seasonal.probabilityText;
+            for (let i = 1; i <= days; i++) {
+                const futureDate = new Date(lastDate);
+                futureDate.setDate(lastDate.getDate() + i);
+                labels.push(`${String(futureDate.getMonth() + 1).padStart(2, '0')}-${String(futureDate.getDate()).padStart(2, '0')}`);
+            }
+            return labels;
+        }
 
-            // COT Report
-            document.getElementById('cot-bias').textContent = market.cot.bias;
-            document.getElementById('cot-score').textContent = `Příspěvek ke skóre: ${market.cot.score}`;
+        /**
+         * Funkce pro aktualizaci karet komponent
+         */
+        function updateCards(simulatedData, realMomentum) {
+            // (Beze změny)
+            document.getElementById('seasonal-bias').textContent = simulatedData.seasonal.bias;
+            document.getElementById('seasonal-score').textContent = `Příspěvek ke skóre: ${simulatedData.seasonal.score}`;
+            document.getElementById('seasonal-probability').textContent = simulatedData.seasonal.probabilityText;
+
+            document.getElementById('cot-bias').textContent = simulatedData.cot.bias;
+            document.getElementById('cot-score').textContent = `Příspěvek ke skóre: ${simulatedData.cot.score}`;
             
-            // Momentum
-            document.getElementById('momentum-bias').textContent = market.momentum.bias;
-            document.getElementById('momentum-score').textContent = `Příspěvek ke skóre: ${market.momentum.score}`;
+            document.getElementById('momentum-bias').textContent = realMomentum.bias;
+            document.getElementById('momentum-score').textContent = `Příspěvek ke skóre: ${realMomentum.score}`;
+        }
 
-            // 2. Aktualizace hlavního grafu
-            updateChart(market);
+        /**
+         * Hlavní funkce pro orchestraci aktualizace
+         */
+        async function updateDashboard(marketKey) {
+            if (loadingOverlay) {
+                loadingOverlay.classList.remove('hidden');
+            }
+            
+            try {
+                const simulatedData = mockMarketData[marketKey];
+                if (!simulatedData) {
+                    throw new Error(`Nenalezena žádná data pro trh: ${marketKey}`);
+                }
+
+                // 1. Načtení reálných dat o ceně
+                const realData = await fetchRealPriceData(simulatedData.apiConfig);
+                if (!realData) {
+                    return; 
+                }
+
+                // 2. Výpočet reálného momentu
+                const realMomentum = calculateMomentum(realData.priceHistory);
+
+                // 3. Aktualizace karet
+                updateCards(simulatedData, realMomentum);
+
+                // 4. Aktualizace hlavního grafu
+                updateChart(
+                    simulatedData.history,
+                    simulatedData.seasonal.forecast,
+                    realData.priceHistory,
+                    simulatedData.priceForecast,
+                    realData.dateLabels
+                );
+
+            } catch (error) {
+                console.error('Chyba v updateDashboard:', error);
+                showError(`Došlo k závažné chybě: ${error.message}`);
+            } finally {
+                if (loadingOverlay) {
+                    loadingOverlay.classList.add('hidden');
+                }
+            }
         }
 
         // --- Inicializace aplikace ---
         document.addEventListener('DOMContentLoaded', () => {
             const selectElement = document.getElementById('market-select');
             
+            // Inicializace globálních proměnných pro DOM elementy
+            loadingOverlay = document.getElementById('loading-overlay');
+            errorOverlay = document.getElementById('error-overlay');
+            errorMessageElement = document.getElementById('error-message');
+            
+            // Inicializace nových elementů pro API klíč
+            apiKeyInput = document.getElementById('api-key-input');
+            saveApiKeyBtn = document.getElementById('save-api-key-btn');
+            apiKeyStatus = document.getElementById('api-key-status');
+
+            // Načtení uloženého klíče při startu
+            const storedKey = localStorage.getItem(API_KEY_STORAGE);
+            if (storedKey) {
+                apiKeyInput.value = storedKey;
+                apiKeyStatus.textContent = 'API klíč načten z lokálního úložiště.';
+                apiKeyStatus.className = 'text-xs text-green-500 mt-2 block';
+            } else {
+                apiKeyStatus.textContent = 'Vložte prosím svůj API klíč.';
+                apiKeyStatus.className = 'text-xs text-yellow-500 mt-2 block';
+            }
+
+            // Listener pro uložení klíče
+            saveApiKeyBtn.addEventListener('click', () => {
+                const newKey = apiKeyInput.value.trim();
+                if (newKey) {
+                    localStorage.setItem(API_KEY_STORAGE, newKey);
+                    apiKeyStatus.textContent = 'API klíč úspěšně uložen v prohlížeči.';
+                    apiKeyStatus.className = 'text-xs text-green-500 mt-2 block';
+                    // Po uložení klíče rovnou zkusíme aktualizovat data
+                    updateDashboard(selectElement.value);
+                } else {
+                    apiKeyStatus.textContent = 'Nelze uložit prázdný klíč.';
+                    apiKeyStatus.className = 'text-xs text-red-500 mt-2 block';
+                }
+            });
+
             // Inicializace grafu
             initializeChart();
 
             // První spuštění pro výchozí trh
+            // (Spustí se, i když klíč chybí - fetchRealPriceData to zachytí a ukáže chybu)
             updateDashboard(selectElement.value);
 
             // Přidání listeneru na změnu trhu
             selectElement.addEventListener('change', (e) => {
                 updateDashboard(e.target.value);
+            });
+
+            // Přidání listenerů pro zavírání chybového okna
+            const errorButton = errorOverlay.querySelector('button');
+            if (errorButton) {
+                errorButton.addEventListener('click', hideError);
+            }
+            errorOverlay.addEventListener('click', (e) => {
+                if (e.target === errorOverlay) {
+                    hideError();
+                }
             });
         });
 
