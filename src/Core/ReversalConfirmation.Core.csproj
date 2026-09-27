@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Platform-independent engine. The ATAS project compiles these same sources into its own DLL,
+       so the indicator ships as a single assembly; this project exists for tests and the replay tool. -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>ReversalConfirmation.Core</RootNamespace>
+    <AssemblyName>ReversalConfirmation.Core</AssemblyName>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

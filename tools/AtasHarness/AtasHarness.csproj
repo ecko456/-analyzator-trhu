@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Drives the real indicator class through an ATAS-like call sequence on real footprint data (stub host).
+       Build with -p:AtasStubs=true; args: DATA_DIR MONTHS -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Atas/ReversalConfirmation.Atas.csproj" />
+    <ProjectReference Include="../../src/AtasStubs/AtasStubs.csproj" />
+    <Compile Include="../Replay/FootprintReader.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compile-check only: minimal stand-ins for the ATAS platform API used by the indicator, with signatures taken
+       from the official indicator sources (github.com/AtasPlatform/Indicators). Never shipped, never loaded by ATAS. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>AtasStubs</AssemblyName>
+    <NoWarn>$(NoWarn);CS0067;CA1416</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
+  </ItemGroup>
+</Project>

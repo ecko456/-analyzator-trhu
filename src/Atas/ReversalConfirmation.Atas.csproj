@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    ATAS indicator DLL (ReversalConfirmation.dll). Contains the engine sources from ../Core, so ATAS loads a single file.
+
+    Build on Windows with ATAS installed:
+        dotnet build -c Release                                  (ATAS on .NET 10, default)
+        dotnet build -c Release -p:TargetFramework=net8.0-windows  (older ATAS on .NET 8)
+        dotnet build -c Release -p:AtasX=true                    (ATAS X, cross-platform)
+    Set ATAS_BASE if ATAS is not installed in the default folder.
+
+    Compile check without ATAS (CI / Linux):
+        dotnet build -c Release -p:AtasStubs=true
+  -->
+  <PropertyGroup>
+    <AssemblyName>ReversalConfirmation</AssemblyName>
+    <RootNamespace>ReversalConfirmation.Atas</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CA1416;NU1903</NoWarn>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(AtasStubs)' != 'true' and '$(AtasX)' != 'true'">
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ATAS_BASE Condition="'$(ATAS_BASE)' == ''">C:\Program Files (x86)\ATAS Platform</ATAS_BASE>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(AtasX)' == 'true'">
+    <TargetFramework>net10.0</TargetFramework>
+    <DefineConstants>$(DefineConstants);CROSS_PLATFORM</DefineConstants>
+    <ATAS_BASE Condition="'$(ATAS_BASE)' == ''">C:\Program Files\ATAS X</ATAS_BASE>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(AtasStubs)' == 'true'">
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Core\*.cs" LinkBase="Core" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(AtasStubs)' != 'true'">
+    <Reference Include="ATAS.Indicators"><HintPath>$(ATAS_BASE)\ATAS.Indicators.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="ATAS.DataFeedsCore"><HintPath>$(ATAS_BASE)\ATAS.DataFeedsCore.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="OFT.Rendering"><HintPath>$(ATAS_BASE)\OFT.Rendering.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="OFT.Attributes"><HintPath>$(ATAS_BASE)\OFT.Attributes.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="Utils.Common"><HintPath>$(ATAS_BASE)\Utils.Common.dll</HintPath><Private>False</Private></Reference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(AtasX)' == 'true'">
+    <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(AtasStubs)' == 'true'">
+    <ProjectReference Include="..\AtasStubs\AtasStubs.csproj" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
+  </ItemGroup>
+</Project>
