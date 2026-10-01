@@ -14,7 +14,9 @@
   <PropertyGroup>
     <AssemblyName>ReversalConfirmation</AssemblyName>
     <RootNamespace>ReversalConfirmation.Atas</RootNamespace>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- strict in the dev/CI build (stubs); on the user's machine a warning caused by a future ATAS version
+         (e.g. a new base-class member with the same name) must not stop the installation -->
+    <TreatWarningsAsErrors Condition="'$(AtasStubs)' == 'true'">true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);CA1416;NU1903</NoWarn>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>

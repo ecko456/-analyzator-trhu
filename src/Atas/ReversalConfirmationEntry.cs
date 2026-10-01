@@ -719,7 +719,7 @@ namespace ReversalConfirmation.Atas
             return lo;
         }
 
-        private bool Visible(Mark m)
+        private bool IsMarkShown(Mark m)
         {
             switch (m.Type)
             {
@@ -751,7 +751,7 @@ namespace ReversalConfirmation.Atas
             {
                 var m = e.Marks[i];
                 if (m.Bar > last) break;
-                if (!Visible(m)) continue;
+                if (!IsMarkShown(m)) continue;
                 var col = m.Dir > 0 ? BullColor : BearColor;
                 var c = MarkCenter(m);
                 switch (m.Type)
@@ -841,7 +841,7 @@ namespace ReversalConfirmation.Atas
             for (int i = LowerBound(e.Marks, bar); i < e.Marks.Count && e.Marks[i].Bar == bar; i++)
             {
                 var m = e.Marks[i];
-                if (!Visible(m) || string.IsNullOrEmpty(m.Tooltip)) continue;
+                if (!IsMarkShown(m) || string.IsNullOrEmpty(m.Tooltip)) continue;
                 int d = Math.Abs(mouse.Y - MarkCenter(m).Y);
                 if (d < best) { best = d; text = m.Tooltip; }
             }
