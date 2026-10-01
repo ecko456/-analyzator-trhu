@@ -15,12 +15,6 @@ using Color = System.Drawing.Color;
 
 namespace ReversalConfirmation.Atas
 {
-    public enum DisplayMode
-    {
-        [Display(Name = "Jen vstupy")] EntriesOnly,
-        [Display(Name = "Vše")] All
-    }
-
     public enum SessionChoice
     {
         [Display(Name = "ETH (18:00–17:00 ET)")] Eth,
@@ -366,53 +360,84 @@ namespace ReversalConfirmation.Atas
 
         #region Parameters: view
 
-        [Display(Name = "Režim", GroupName = GView, Order = 10)]
-        public DisplayMode Mode { get; set; } = DisplayMode.EntriesOnly;
+        [Display(Name = "Tečka: min. skóre k zobrazení", GroupName = GView, Order = 10, Description = "Jen filtr zobrazení; logika a log se nemění. 75 = jen silné reversaly.")]
+        [Range(0, 100)]
+        public int DotMinScore { get; set; } = 60;
 
-        [Display(Name = "Barva bullish", GroupName = GView, Order = 20)]
-        public Color BullColor { get; set; } = Color.FromArgb(255, 0, 170, 90);
+        [Display(Name = "Tečka: číslo skóre vedle", GroupName = GView, Order = 20)]
+        public bool ShowScoreLabel { get; set; }
 
-        [Display(Name = "Barva bearish", GroupName = GView, Order = 30)]
-        public Color BearColor { get; set; } = Color.FromArgb(255, 220, 50, 50);
+        [Display(Name = "Čtvereček C1/C2 (potvrzení)", GroupName = GView, Order = 30)]
+        public bool ShowConfirmations { get; set; } = true;
 
-        [Display(Name = "Barva stopu", GroupName = GView, Order = 40)]
-        public Color StopColor { get; set; } = Color.FromArgb(255, 200, 30, 30);
+        [Display(Name = "Čtvereček R (retest)", GroupName = GView, Order = 40)]
+        public bool ShowRetests { get; set; } = true;
 
-        [Display(Name = "Barva targetů", GroupName = GView, Order = 50)]
-        public Color TargetColor { get; set; } = Color.FromArgb(255, 30, 140, 220);
+        [Display(Name = "Tooltip po najetí myší", GroupName = GView, Order = 50)]
+        public bool ShowTooltip { get; set; } = true;
 
-        [Display(Name = "Barva textu", GroupName = GView, Order = 60)]
-        public Color TextColor { get; set; } = Color.FromArgb(255, 230, 230, 230);
+        [Display(Name = "Kreslit vstupní zóny", GroupName = GView, Order = 60)]
+        public bool ShowZones { get; set; }
 
-        [Display(Name = "Statistický panel", GroupName = GView, Order = 70)]
-        public bool ShowStats { get; set; } = true;
+        [Display(Name = "Kreslit stop a targety (u zón)", GroupName = GView, Order = 70)]
+        public bool ShowTradeLines { get; set; }
 
-        [Display(Name = "Kreslit referenční úrovně", GroupName = GView, Order = 80)]
+        [Display(Name = "Kreslit zrušení kontextu (×)", GroupName = GView, Order = 80)]
+        public bool ShowCancelled { get; set; }
+
+        [Display(Name = "Kreslit varování absorpce (!)", GroupName = GView, Order = 90)]
+        public bool ShowWarnings { get; set; }
+
+        [Display(Name = "Statistický panel", GroupName = GView, Order = 100)]
+        public bool ShowStats { get; set; }
+
+        [Display(Name = "Kreslit referenční úrovně", GroupName = GView, Order = 110)]
         public bool ShowLevels { get; set; }
 
-        [Display(Name = "Tooltip", GroupName = GView, Order = 90)]
-        public bool ShowTooltip { get; set; } = true;
+        [Display(Name = "Barva bullish", GroupName = GView, Order = 120)]
+        public Color BullColor { get; set; } = Color.FromArgb(255, 0, 170, 90);
+
+        [Display(Name = "Barva bearish", GroupName = GView, Order = 130)]
+        public Color BearColor { get; set; } = Color.FromArgb(255, 220, 50, 50);
+
+        [Display(Name = "Barva textu", GroupName = GView, Order = 140)]
+        public Color TextColor { get; set; } = Color.FromArgb(255, 230, 230, 230);
+
+        [Display(Name = "Barva stopu", GroupName = GView, Order = 150)]
+        public Color StopColor { get; set; } = Color.FromArgb(255, 200, 30, 30);
+
+        [Display(Name = "Barva targetů", GroupName = GView, Order = 160)]
+        public Color TargetColor { get; set; } = Color.FromArgb(255, 30, 140, 220);
 
         #endregion
 
         #region Parameters: alerts
 
-        [Display(Name = "Alert: nová vstupní zóna", GroupName = GAlerts, Order = 10)]
-        public bool AlertNewZone { get; set; } = true;
+        [Display(Name = "Alert: potvrzení C1/C2", GroupName = GAlerts, Order = 10)]
+        public bool AlertConfirmation { get; set; } = true;
 
-        [Display(Name = "Alert: fill zóny", GroupName = GAlerts, Order = 20)]
-        public bool AlertFill { get; set; } = true;
+        [Display(Name = "Alert: retest R", GroupName = GAlerts, Order = 20)]
+        public bool AlertRetest { get; set; } = true;
 
-        [Display(Name = "Alert: dotyk zóny (intrabar)", GroupName = GAlerts, Order = 30, Description = "Upozorní hned, jak cena během svíčky dosáhne aktivní zóny (oficiální fill se vyhodnotí na close).")]
-        public bool AlertTouch { get; set; }
-
-        [Display(Name = "Alert: zrušení kontextu / absorpce selhala", GroupName = GAlerts, Order = 40)]
-        public bool AlertCancel { get; set; } = true;
-
-        [Display(Name = "Alert: reversal", GroupName = GAlerts, Order = 50)]
+        [Display(Name = "Alert: reversal (tečka)", GroupName = GAlerts, Order = 30)]
         public bool AlertReversal { get; set; }
 
-        [Display(Name = "Zvukový soubor", GroupName = GAlerts, Order = 60)]
+        [Display(Name = "Alert reversalu jen pro silné (≥ silné skóre)", GroupName = GAlerts, Order = 40)]
+        public bool AlertReversalStrongOnly { get; set; } = true;
+
+        [Display(Name = "Alert: nová vstupní zóna", GroupName = GAlerts, Order = 50)]
+        public bool AlertNewZone { get; set; }
+
+        [Display(Name = "Alert: fill zóny", GroupName = GAlerts, Order = 60)]
+        public bool AlertFill { get; set; }
+
+        [Display(Name = "Alert: dotyk zóny (intrabar)", GroupName = GAlerts, Order = 70, Description = "Upozorní hned, jak cena během svíčky dosáhne aktivní zóny (oficiální fill se vyhodnotí na close).")]
+        public bool AlertTouch { get; set; }
+
+        [Display(Name = "Alert: zrušení kontextu / absorpce selhala", GroupName = GAlerts, Order = 80)]
+        public bool AlertCancel { get; set; }
+
+        [Display(Name = "Zvukový soubor", GroupName = GAlerts, Order = 90)]
         public string AlertFile { get; set; } = "alert1";
 
         #endregion
@@ -554,11 +579,13 @@ namespace ReversalConfirmation.Atas
         {
             bool on = e.Type switch
             {
+                EngineEventType.Confirmation => AlertConfirmation,
+                EngineEventType.Retest => AlertRetest,
+                EngineEventType.Reversal => AlertReversal && (!AlertReversalStrongOnly || e.Score >= _s.StrongScore),
                 EngineEventType.NewZone => AlertNewZone,
                 EngineEventType.ZoneFilled => AlertFill,
                 EngineEventType.ContextCancelled => AlertCancel,
                 EngineEventType.AbsorptionFailed => AlertCancel,
-                EngineEventType.Reversal => AlertReversal,
                 _ => false
             };
             if (!on) return;
@@ -602,7 +629,7 @@ namespace ReversalConfirmation.Atas
                 int first = Math.Max(0, FirstVisibleBarNumber), last = LastVisibleBarNumber;
                 lock (engine.Sync)
                 {
-                    DrawZones(context, engine, first, last);
+                    if (ShowZones) DrawZones(context, engine, first, last);
                     DrawMarks(context, engine, first, last);
                     if (ShowLevels) DrawLevels(context, engine, last);
                     if (ShowStats) DrawStats(context, engine);
@@ -647,7 +674,7 @@ namespace ReversalConfirmation.Atas
                 string label = !double.IsNaN(z.Probability) ? $"{z.Score:0} · {z.Probability * 100:0}%" : $"{z.Score:0}";
                 g.DrawString(label, _font, TextColor, x2 + 3, y - 6);
 
-                if (tradeEnd < 0) continue;
+                if (tradeEnd < 0 || !ShowTradeLines) continue;
                 int t1 = X(z.FillBar), t2 = X(tradeEnd) + BarWidth;
                 var stopPen = new RenderPen(StopColor, 1);
                 int ys = Y(z.Stop);
@@ -659,7 +686,7 @@ namespace ReversalConfirmation.Atas
                     int yt = Y(t.Price);
                     int endX = t.HitBar >= 0 ? X(t.HitBar) + BarWidth : t2;
                     g.DrawLine(tgPen, t1, yt, endX, yt);
-                    g.DrawString(t.Name + (t.HitBar >= 0 ? " ✓" : ""), _font, TargetColor, endX + 2, yt - 6);
+                    g.DrawString(t.Name + (t.HitBar >= 0 ? " ok" : ""), _font, TargetColor, endX + 2, yt - 6);
                 }
                 if (BreakEven && z.BreakEvenBar >= 0 && !double.IsNaN(z.Entry))
                 {
@@ -692,44 +719,62 @@ namespace ReversalConfirmation.Atas
             return lo;
         }
 
+        private bool Visible(Mark m)
+        {
+            switch (m.Type)
+            {
+                case MarkType.Reversal: return m.Score >= DotMinScore;
+                case MarkType.Confirmation: return ShowConfirmations;
+                case MarkType.Retest: return ShowRetests;
+                case MarkType.AbsorptionFailed: return ShowWarnings;
+                case MarkType.ContextCancelled: return ShowCancelled;
+                default: return false;
+            }
+        }
+
+        /// <summary>Screen centre of a mark: dot just beyond the extreme, squares one step further out.</summary>
+        private Point MarkCenter(Mark m)
+        {
+            int x = X(m.Bar) + BarWidth / 2;
+            int y = Y(m.Price);
+            int step = m.Type == MarkType.Reversal ? 8 : m.Type == MarkType.Confirmation || m.Type == MarkType.Retest ? 20 : 32;
+            int off = RowHalf + step;
+            return new Point(x, m.Dir > 0 ? y + off : y - off);
+        }
+
+        /// <summary>Dot radius and opacity grow with the score: the better the candle fits, the more visible.</summary>
+        private static int DotRadius(double score) => score >= 80 ? 5 : score >= 70 ? 4 : 3;
+
         private void DrawMarks(RenderContext g, ReversalEngine e, int first, int last)
         {
-            int bw = BarWidth;
             for (int i = LowerBound(e.Marks, first); i < e.Marks.Count; i++)
             {
                 var m = e.Marks[i];
                 if (m.Bar > last) break;
+                if (!Visible(m)) continue;
                 var col = m.Dir > 0 ? BullColor : BearColor;
-                int x = X(m.Bar) + bw / 2;
-                int y = Y(m.Price);
-                int off = 8 + RowHalf;
-                int yy = m.Dir > 0 ? y + off : y - off;
+                var c = MarkCenter(m);
                 switch (m.Type)
                 {
                     case MarkType.Reversal:
-                        bool small = Mode == DisplayMode.EntriesOnly;
-                        int r = small ? (m.Strong ? 3 : 2) : (m.Strong ? 5 : 4);
-                        g.FillEllipse(small ? Alpha(col, 170) : col, new Rectangle(x - r, yy - r, 2 * r, 2 * r));
-                        if (!small)
-                        {
-                            var pts = m.Dir > 0
-                                ? new[] { new Point(x, yy + r + 2), new Point(x - 5, yy + r + 10), new Point(x + 5, yy + r + 10) }
-                                : new[] { new Point(x, yy - r - 2), new Point(x - 5, yy - r - 10), new Point(x + 5, yy - r - 10) };
-                            g.FillPolygon(col, pts);
-                            g.DrawString($"{m.Score:0}", _font, TextColor, x - 10, m.Dir > 0 ? yy + r + 11 : yy - r - 22);
-                        }
+                        int r = DotRadius(m.Score);
+                        int alpha = 150 + (int)(105 * MathUtil.Ramp(m.Score, 60, 90));
+                        g.FillEllipse(Alpha(col, alpha), new Rectangle(c.X - r, c.Y - r, 2 * r, 2 * r));
+                        if (m.Strong) g.DrawEllipse(new RenderPen(col, 1), new Rectangle(c.X - r - 2, c.Y - r - 2, 2 * r + 4, 2 * r + 4));
+                        if (ShowScoreLabel)
+                            g.DrawString(m.Score.ToString("0", CultureInfo.InvariantCulture), _font, TextColor, c.X + r + 3, c.Y - 6);
                         break;
                     case MarkType.Confirmation:
-                        Label(g, m.Label, col, x, m.Dir > 0 ? yy + 10 : yy - 10, true);
+                        Label(g, m.Label, col, c.X, c.Y, true);
                         break;
                     case MarkType.Retest:
-                        Label(g, "R", col, x, m.Dir > 0 ? yy + 10 : yy - 10, true);
+                        Label(g, "R", col, c.X, c.Y, true);
                         break;
                     case MarkType.AbsorptionFailed:
-                        Label(g, "!", Color.Orange, x, m.Dir > 0 ? yy + 22 : yy - 22, true);
+                        Label(g, "!", Color.Orange, c.X, c.Y, true);
                         break;
                     case MarkType.ContextCancelled:
-                        Label(g, "×", Color.Gray, x, m.Dir > 0 ? yy + 22 : yy - 22, false);
+                        Label(g, "×", Color.Gray, c.X, c.Y, false);
                         break;
                 }
             }
@@ -790,15 +835,17 @@ namespace ReversalConfirmation.Atas
             var mouse = MouseLocationInfo.LastPosition;
             int bar = MouseLocationInfo.BarBelowMouse;
             if (bar < first || bar > last) return;
+            // nearest visible mark on the bar under the mouse
             string text = null;
-            int bw = BarWidth;
+            int best = 13;
             for (int i = LowerBound(e.Marks, bar); i < e.Marks.Count && e.Marks[i].Bar == bar; i++)
             {
                 var m = e.Marks[i];
-                int y = Y(m.Price) + (m.Dir > 0 ? 8 + RowHalf : -8 - RowHalf);
-                if (Math.Abs(mouse.Y - y) <= 30 && !string.IsNullOrEmpty(m.Tooltip)) { text = m.Tooltip; break; }
+                if (!Visible(m) || string.IsNullOrEmpty(m.Tooltip)) continue;
+                int d = Math.Abs(mouse.Y - MarkCenter(m).Y);
+                if (d < best) { best = d; text = m.Tooltip; }
             }
-            if (text == null)
+            if (text == null && ShowZones)
                 foreach (var z in e.Zones)
                 {
                     int end = z.EndBar >= 0 ? z.EndBar : z.ExpiryBar;

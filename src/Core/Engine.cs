@@ -298,7 +298,7 @@ namespace ReversalConfirmation.Core
             Marks.Add(mark);
             Events.Add(new EngineEvent
             {
-                Type = EngineEventType.Reversal, Bar = t, Dir = c.Dir, Price = c.ExtremeReal,
+                Type = EngineEventType.Reversal, Bar = t, Dir = c.Dir, Price = c.ExtremeReal, Score = c.Score,
                 Text = $"{(c.Dir > 0 ? "Bullish" : "Bearish")} reversal, skóre {c.Score:0} ({c.VariantName}, {c.Level.Name})"
             });
             ctx.RevRow = StartReversalTracker(c, t, "REV", null, ctx, revRow);
@@ -384,7 +384,7 @@ namespace ReversalConfirmation.Core
                 {
                     Bar = t, Dir = ctx.Dir, Type = MarkType.AbsorptionFailed, Label = "!",
                     Price = ctx.Dir > 0 ? _bars[t].Low : _bars[t].High, ContextId = ctx.Id,
-                    Tooltip = $"Absorpce selhala: close pod VPOC reversalu ({ctx.Dir * ctx.RevPocO:0.##}) s deltou z={z:0.0}"
+                    Tooltip = $"! Absorpce selhala: close za VPOC reversalu ({F(ctx.Dir * ctx.RevPocO, "0.##")}) se silnou protisměrnou deltou (z {F(ctx.Dir * z, "+0.0;-0.0")})"
                 });
                 Events.Add(new EngineEvent { Type = EngineEventType.AbsorptionFailed, Bar = t, Dir = ctx.Dir, Price = ctx.Dir * ob.C, Text = "Absorpce selhala: close pod VPOC reversalu se silnou protisměrnou deltou" });
             }
@@ -404,7 +404,12 @@ namespace ReversalConfirmation.Core
                     {
                         Bar = t, Dir = ctx.Dir, Type = MarkType.Retest, Label = "R",
                         Price = ctx.Dir > 0 ? _bars[t].Low : _bars[t].High, ContextId = ctx.Id, Score = ctx.Score,
-                        Tooltip = $"Retest: vyšší low {(ob.L - ctx.ExtremeO) / Tick:0} t nad extrémem, |delta| {Math.Abs(ob.Delta):0} ({Math.Abs(ob.Delta) / Math.Abs(ctx.RefDelta) * 100:0} % flushe)"
+                        Tooltip = RetestTooltip(ctx, ob)
+                    });
+                    Events.Add(new EngineEvent
+                    {
+                        Type = EngineEventType.Retest, Bar = t, Dir = ctx.Dir, Price = ctx.Dir * ob.Poc, Score = ctx.Score,
+                        Text = $"Retest {(ctx.Dir > 0 ? "bullish" : "bearish")} reversalu, VPOC {F(ctx.Dir * ob.Poc, "0.##")}"
                     });
                     if ((S.Zones & ZoneTypes.Retest) != 0)
                         CreateZone(ctx, t, ZoneTypes.Retest, ob.Poc, ctx.Score, double.NaN, null);
@@ -497,9 +502,12 @@ namespace ReversalConfirmation.Core
             {
                 Bar = t, Dir = ctx.Dir, Type = MarkType.Confirmation, Label = label,
                 Price = ctx.Dir > 0 ? _bars[t].Low : _bars[t].High, Score = conf.Score, ContextId = ctx.Id,
-                Tooltip = $"{label} potvrzení {conf.Score:0}\nDelta z={conf.Z:0.0}, CLV {conf.Clv:0.00}, efektivita {conf.EffPct:0}. pct" +
-                          $"\nImbalance v řadě: {conf.Imbalances}, objem {conf.VolPct:0}. pct" + (conf.AboveRevHigh ? "\nClose nad high reversalu" : "") +
-                          (conf.Warning ? "\n⚠ POC nahoře + prodej nad POC" : "")
+                Tooltip = ConfirmationTooltip(ctx, label, conf, ob)
+            });
+            Events.Add(new EngineEvent
+            {
+                Type = EngineEventType.Confirmation, Bar = t, Dir = ctx.Dir, Price = ctx.Dir * ob.Poc, Score = conf.Score,
+                Text = $"{label} potvrzení {(ctx.Dir > 0 ? "bullish" : "bearish")} reversalu, skóre {F(conf.Score, "0")}, VPOC {F(ctx.Dir * ob.Poc, "0.##")}"
             });
 
             var row = new LogRow();
@@ -813,22 +821,85 @@ namespace ReversalConfirmation.Core
             }
         }
 
+        // Czech number format without depending on installed cultures (decimal comma)
+        private static readonly NumberFormatInfo Cz = new NumberFormatInfo { NumberDecimalSeparator = ",", NumberGroupSeparator = " " };
+        private static string F(double v, string fmt) => v.ToString(fmt, Cz);
+
+        /// <summary>Plain-language explanation of a reversal (only WGL4 glyphs so every Windows font renders it).</summary>
         private string ReversalTooltip(Candidate c, double prob, bool news)
         {
+            bool bull = c.Dir > 0;
+            string ext = bull ? "low" : "high";
+            string against = bull ? "prodejci" : "kupci";
+            string other = bull ? "high" : "low";
             var sb = new StringBuilder();
-            sb.Append(c.Dir > 0 ? "Bullish" : "Bearish").Append(" reversal  skóre ").Append(c.Score.ToString("0", CultureInfo.InvariantCulture));
-            if (!double.IsNaN(prob)) sb.Append("  P=").Append((prob * 100).ToString("0", CultureInfo.InvariantCulture)).Append(" %");
-            sb.Append('\n').Append("Varianta: ").Append(c.VariantName);
-            sb.Append('\n').Append("Úroveň: ").Append(c.Level.Name).Append(' ').Append(c.Level.Price.ToString("0.##", CultureInfo.InvariantCulture));
-            if (c.Confluence > 0) sb.Append(" (+").Append(c.Confluence).Append(" konfluence)");
-            sb.Append('\n').Append("Komponenty: ");
-            string[] n = { "A", "B", "C", "D", "E", "F", "G", "H", "I" };
-            for (int i = 0; i < 9; i++)
+            sb.Append(bull ? "▲ BULLISH REVERSAL" : "▼ BEARISH REVERSAL").Append("   skóre ").Append(F(c.Score, "0"));
+            if (c.Score >= S.StrongScore) sb.Append(" (silný)");
+            if (!double.IsNaN(prob)) sb.Append('\n').Append("Úspěšnost podobných signálů (T1 před stopem): ").Append(F(prob * 100, "0")).Append(" %");
+            sb.Append('\n').Append("Úroveň: ").Append(c.Level.Name).Append(' ').Append(F(c.Level.Price, "0.##"));
+            if (c.Confluence > 0) sb.Append("  (+").Append(c.Confluence).Append(c.Confluence == 1 ? " další úroveň)" : " další úrovně)");
+            sb.Append('\n').Append("Varianta: ").Append(c.VariantName).Append(c.Variant switch
             {
-                if (i == 7 && !c.HApplicable || i == 8 && !c.IApplicable) continue;
-                sb.Append(n[i]).Append('=').Append((c.S[i] * 100).ToString("0", CultureInfo.InvariantCulture)).Append(' ');
+                Variant.OneBar => " (jedna svíčka)",
+                Variant.Stall => " (absorpce několika svíček + spouštěč)",
+                _ => " (flush + návrat)"
+            });
+            sb.Append('\n');
+
+            void Line(int i, string label, string detail)
+            {
+                sb.Append('\n').Append(c.S[i] >= 0.6 ? "● " : "○ ").Append(label);
+                if (!string.IsNullOrEmpty(detail)) sb.Append(": ").Append(detail);
             }
-            if (news) sb.Append('\n').Append("⚠ okno zpráv");
+
+            Line(0, bull ? "A prodejní tlak předtím" : "A nákupní tlak předtím", $"pohyb {F(c.DropAtr, "0.0")}× ATR, delta z {F(c.Dir * c.MinZ, "+0.0;-0.0")}");
+            Line(1, "B test úrovně", c.LevelDistTicks >= 0 ? $"{F(c.LevelDistTicks, "0")} t před úrovní" : $"{F(-c.LevelDistTicks, "0")} t za úroveň");
+            Line(2, "C sweep a rychlý návrat", (c.SweepOk > 0 ? $"vybral předchozí {ext}y" : "bez sweepu") +
+                                                    (c.BarsBeyond == 0 ? ", návrat hned" : $", návrat po {c.BarsBeyond} sv."));
+            var d = new List<string>();
+            if (c.Div1 > 0) d.Add("delta silnější než u minulého swingu");
+            if (c.Div2 > 0) d.Add("kumul. delta bez nového extrému");
+            if (c.Flip > 0) d.Add("delta se ve svíčce otočila");
+            Line(3, "D divergence delty", d.Count > 0 ? string.Join(", ", d) : "ne");
+            Line(4, $"E absorpce u {ext}u", $"POC {F(c.PocPos * 100, "0")} % cesty od {ext}u, objem {F(c.VolPct, "0")}. percentil");
+            Line(5, $"F vyčerpání na {ext}u", $"{against} slábnou k {ext}u, na samém {ext}u {F(c.FinAuction * 100, "0")} % průměru");
+            Line(6, "G close", $"{F(c.Clv * 100, "0")} % cesty od {ext}u k {other}u");
+            if (c.HApplicable)
+                Line(7, $"H selhaný flush ({against} chyceni)", double.IsNaN(c.FlushZ) ? "" : $"delta z {F(c.Dir * c.FlushZ, "+0.0;-0.0")}, objem {F(c.FlushVolPct, "0")}. pct");
+            if (c.IApplicable)
+                Line(8, "I stall (absorpce)", $"{c.StallBars} svíček, delta z {F(c.Dir * c.StallZ, "+0.0;-0.0")} bez posunu ceny");
+            if (news) sb.Append("\n\n! svíčka v okně ekonomických zpráv");
+            return sb.ToString();
+        }
+
+        private string ConfirmationTooltip(Context ctx, string label, ConfResult conf, OBar ob)
+        {
+            bool bull = ctx.Dir > 0;
+            var sb = new StringBuilder();
+            sb.Append(label).Append("  POTVRZENÍ ").Append(bull ? "bullish" : "bearish").Append(" reversalu   skóre ").Append(F(conf.Score, "0"));
+            sb.Append('\n').Append(bull ? "Kupci převzali iniciativu a low reversalu drží." : "Prodejci převzali iniciativu a high reversalu drží.");
+            sb.Append('\n');
+            sb.Append('\n').Append("● delta z ").Append(F(ctx.Dir * conf.Z, "+0.0;-0.0")).Append(bull ? " (agresivní nákupy)" : " (agresivní prodeje)");
+            sb.Append('\n').Append("● close ").Append(F(conf.Clv * 100, "0")).Append(bull ? " % cesty od lowu k highu, nad close předchozí svíčky" : " % cesty od highu k lowu, pod close předchozí svíčky");
+            sb.Append('\n').Append("● efektivita ").Append(F(conf.EffPct, "0")).Append(". percentil (cena se opravdu pohnula)");
+            sb.Append('\n').Append(conf.Imbalances >= S.Conf_ImbalanceCount ? "● " : "○ ").Append(bull ? "ask" : "bid").Append(" imbalance v řadě: ").Append(conf.Imbalances);
+            sb.Append('\n').Append(conf.VolPct >= S.Conf_VolumePct ? "● " : "○ ").Append("objem ").Append(F(conf.VolPct, "0")).Append(". percentil");
+            sb.Append('\n').Append(conf.AboveRevHigh ? "● " : "○ ").Append(bull ? "close nad high reversalu" : "close pod low reversalu");
+            if (conf.Warning) sb.Append('\n').Append(bull ? "! POC nahoře a prodej nad POC (prodej do růstu)" : "! POC dole a nákup pod POC (nákup do poklesu)");
+            sb.Append('\n').Append('\n').Append("VPOC svíčky (úroveň pro limit): ").Append(F(ctx.Dir * ob.Poc, "0.##"));
+            return sb.ToString();
+        }
+
+        private string RetestTooltip(Context ctx, OBar ob)
+        {
+            bool bull = ctx.Dir > 0;
+            var sb = new StringBuilder();
+            sb.Append("R  RETEST ").Append(bull ? "bullish" : "bearish").Append(" reversalu");
+            sb.Append('\n').Append("Cena se vrátila k ").Append(bull ? "low" : "high").Append(" reversalu, ale ").Append(bull ? "nové low" : "nové high").Append(" neudělala:");
+            sb.Append('\n').Append("● ").Append(bull ? "vyšší low " : "nižší high ").Append(F((ob.L - ctx.ExtremeO) / Tick, "0")).Append(" t od extrému reversalu");
+            sb.Append('\n').Append("● slabá delta: ").Append(F(Math.Abs(ob.Delta) / Math.Abs(ctx.RefDelta) * 100, "0")).Append(" % nejsilnější svíčky pohybu");
+            sb.Append('\n').Append(bull ? "Prodejci už nemají sílu tlačit cenu níž." : "Kupci už nemají sílu tlačit cenu výš.");
+            sb.Append('\n').Append('\n').Append("VPOC svíčky (úroveň pro limit): ").Append(F(ctx.Dir * ob.Poc, "0.##"));
             return sb.ToString();
         }
 

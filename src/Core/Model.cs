@@ -95,6 +95,8 @@ namespace ReversalConfirmation.Core
     public enum EngineEventType
     {
         Reversal,
+        Confirmation,
+        Retest,
         NewZone,
         ZoneFilled,
         ContextCancelled,
@@ -107,6 +109,7 @@ namespace ReversalConfirmation.Core
         public int Bar;
         public int Dir;
         public double Price;
+        public double Score;
         public string Text;
     }
 

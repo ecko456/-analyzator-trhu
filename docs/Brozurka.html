@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<title>Průvodce Reversal &amp; Confirmation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+  :root {
+    --bg: #f2f4f6;
+    --surface: #ffffff;
+    --ink: #16202b;
+    --muted: #5a6573;
+    --line: #d6dbe1;
+    --soft: #e8ecf0;
+    --bull: #16875a;
+    --bear: #c23b3b;
+    --warn: #b36b00;
+    --link: #1f5fad;
+    --tip-bg: #1a1f27;
+    --tip-ink: #e6e9ee;
+    --tip-muted: #9aa4b1;
+    --display: "IBM Plex Sans Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+    --body: "IBM Plex Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0f1318; --surface: #161b22; --ink: #e3e7ec; --muted: #99a3af; --line: #2a323d; --soft: #1c232c;
+      --bull: #2cb47a; --bear: #ea5a57; --warn: #e0a040; --link: #7fb0ff; --tip-bg: #0b0e12;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f1318; --surface: #161b22; --ink: #e3e7ec; --muted: #99a3af; --line: #2a323d; --soft: #1c232c;
+    --bull: #2cb47a; --bear: #ea5a57; --warn: #e0a040; --link: #7fb0ff; --tip-bg: #0b0e12;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--body); margin: 0; }
+  .page { max-width: 780px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 72px; display: grid; gap: 56px; }
+  section { display: grid; gap: 18px; }
+  h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2rem, 6vw, 2.9rem); font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 1.65rem; font-weight: 600; }
+  h3 { font-size: 1.15rem; font-weight: 600; }
+  p { margin: 0; max-width: 65ch; }
+  ul, ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; max-width: 65ch; }
+  a { color: var(--link); }
+  .eyebrow { font: 600 0.78rem/1 var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .lede { font-size: 1.12rem; color: var(--muted); }
+  .mono { font-family: var(--mono); font-size: 0.92em; }
+  .bull { color: var(--bull); font-weight: 600; }
+  .bear { color: var(--bear); font-weight: 600; }
+  .muted { color: var(--muted); }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
+
+  header { display: grid; gap: 14px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 0.9rem; }
+
+  /* legend: the one thing the reader must know */
+  .legend { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 20px; }
+  .legend-row { display: grid; grid-template-columns: 72px 1fr; gap: 16px; align-items: center; padding-block: 12px; border-bottom: 1px solid var(--line); }
+  .legend-row:last-child { border-bottom: 0; }
+  .legend-row svg { width: 72px; height: 40px; }
+  .legend-row strong { display: block; font-weight: 600; }
+  .legend-row span { color: var(--muted); font-size: 0.95rem; }
+
+  figure { margin: 0; display: grid; gap: 10px; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption { color: var(--muted); font-size: 0.92rem; max-width: 65ch; }
+  .figbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; }
+  .figbox svg { min-width: 560px; }
+
+  .c-bull { fill: var(--bull); }
+  .c-bear { fill: var(--bear); }
+  .s-bull { stroke: var(--bull); }
+  .s-bear { stroke: var(--bear); }
+  .ink { fill: currentColor; }
+  .t-muted { fill: var(--muted); }
+  .t-white { fill: #ffffff; }
+  .box { fill: var(--surface); stroke: currentColor; }
+  .box-soft { fill: var(--soft); stroke: var(--line); }
+  .box-bad { fill: var(--surface); stroke: var(--bear); }
+
+  .steps { counter-reset: s; list-style: none; padding: 0; display: grid; gap: 14px; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; }
+  .steps li::before { content: counter(s); font: 600 1rem/34px var(--display); width: 34px; height: 34px; text-align: center; border-radius: 50%; background: var(--soft); border: 1px solid var(--line); }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 600 0.78rem/1.3 var(--body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--soft); }
+  tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .key { font: 600 1rem var(--display); width: 30px; }
+  .tag { display: inline-block; font: 600 0.7rem/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 7px; border-radius: 4px; background: var(--soft); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+  .tag.gate { color: var(--ink); border-color: var(--ink); background: transparent; }
+  .good { color: var(--bull); font-weight: 600; }
+
+  /* the ATAS tooltip as it appears on the chart */
+  .tooltip { background: var(--tip-bg); color: var(--tip-ink); font: 12.5px/1.55 var(--mono); padding: 14px 16px; border-radius: 6px; border: 1px solid #3a4250; white-space: pre; overflow-x: auto; max-width: 100%; }
+  .tooltip .dim { color: var(--tip-muted); }
+  .tooltip .g { color: #2cb47a; }
+
+  /* footprint cluster */
+  .fp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+  .cluster { font: 13px/1 var(--mono); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .cluster div { display: grid; grid-template-columns: 76px 1fr 1fr; padding: 5px 10px; font-variant-numeric: tabular-nums; }
+  .cluster div:nth-child(odd) { background: var(--soft); }
+  .cluster .hdr { color: var(--muted); font-family: var(--body); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  .cluster span:nth-child(2) { text-align: right; padding-right: 10px; }
+  .cluster .poc { outline: 2px solid var(--ink); outline-offset: -2px; font-weight: 500; }
+  .cluster .hot span:nth-child(2) { color: var(--bear); font-weight: 500; }
+  .cluster .close span:first-child::after { content: " ◄ close"; color: var(--muted); }
+
+  .note { border-left: 3px solid var(--warn); padding: 4px 0 4px 14px; max-width: 65ch; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 6px; align-content: start; }
+  .card p { font-size: 0.95rem; }
+  dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 8px 18px; max-width: 70ch; }
+  dt { font-weight: 600; }
+  dd { margin: 0; color: var(--muted); }
+
+  @media (max-width: 600px) {
+    .fp { grid-template-columns: 1fr; }
+    dl { grid-template-columns: 1fr; gap: 2px; }
+    dd { margin-bottom: 10px; }
+    .legend-row { grid-template-columns: 56px 1fr; }
+    .legend-row svg { width: 56px; }
+  }
+</style>
+
+<div class="page">
+
+  <header>
+    <div class="eyebrow">ATAS · ES futures · M5 footprint</div>
+    <h1>Reversal &amp; Confirmation</h1>
+    <p class="lede">Order-flow asistent, který za tebe čte footprint a na grafu označí svíčky, jejichž obchod nejvíc odpovídá obratu. Neobchoduje a nic za tebe nerozhoduje. Je to druhý názor, který nemá únavu ani emoce.</p>
+    <div class="meta"><span>Verze pro ES M5</span><span>Otestováno na 2 letech tick dat (07/2024–06/2026)</span><span>Signály se nepřekreslují</span></div>
+  </header>
+
+  <section aria-labelledby="co-vidis">
+    <h2 id="co-vidis">Co uvidíš na grafu</h2>
+    <p>Indikátor kreslí jen tři druhy značek. Všechno ostatní najdeš po najetí myší.</p>
+    <div class="legend">
+      <div class="legend-row">
+        <svg viewBox="0 0 72 40" role="img" aria-label="Tři zelené tečky podle síly: malá, střední a velká s kroužkem">
+          <circle cx="12" cy="20" r="3" class="c-bull" opacity="0.65"/>
+          <circle cx="32" cy="20" r="4" class="c-bull" opacity="0.85"/>
+          <circle cx="56" cy="20" r="5" class="c-bull"/>
+          <circle cx="56" cy="20" r="8" fill="none" class="s-bull" stroke-width="1.2"/>
+        </svg>
+        <div><strong>Tečka = reversal</strong><span>Svíčka splnila podmínky obratu na referenční úrovni. Čím větší a sytější, tím vyšší skóre. S kroužkem = silný reversal (skóre 75+). Zelená pod low je bullish, červená nad high bearish.</span></div>
+      </div>
+      <div class="legend-row">
+        <svg viewBox="0 0 72 40" role="img" aria-label="Zelené čtverečky s popisky C1 a C2">
+          <rect x="4" y="11" width="26" height="18" rx="2" class="c-bull"/>
+          <text x="17" y="24" text-anchor="middle" class="t-white" font-size="12" font-weight="700" font-family="IBM Plex Sans, Arial, sans-serif">C1</text>
+          <rect x="40" y="11" width="26" height="18" rx="2" class="c-bull"/>
+          <text x="53" y="24" text-anchor="middle" class="t-white" font-size="12" font-weight="700" font-family="IBM Plex Sans, Arial, sans-serif">C2</text>
+        </svg>
+        <div><strong>Čtvereček C1 / C2 = potvrzení</strong><span>Po reversalu přišla svíčka, ve které nová strana převzala iniciativu a extrém reversalu drží. Na jeden reversal připadají nejvýš dvě potvrzení.</span></div>
+      </div>
+      <div class="legend-row">
+        <svg viewBox="0 0 72 40" role="img" aria-label="Zelený čtvereček s písmenem R">
+          <rect x="23" y="11" width="26" height="18" rx="2" class="c-bull"/>
+          <text x="36" y="24" text-anchor="middle" class="t-white" font-size="12" font-weight="700" font-family="IBM Plex Sans, Arial, sans-serif">R</text>
+        </svg>
+        <div><strong>Čtvereček R = retest</strong><span>Cena se vrátila k extrému reversalu, ale udělala vyšší low (u bearish nižší high) se slabou deltou. V datech je to nejsilnější místo pro vstup.</span></div>
+      </div>
+    </div>
+    <p class="muted">Značky se objeví až po uzavření svíčky a potom se už nikdy nemění. Co vidíš v historii, viděl bys i živě.</p>
+  </section>
+
+  <section aria-labelledby="priklad">
+    <h2 id="priklad">Jak to vypadá v praxi</h2>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 720 330" role="img" aria-label="Bullish scénář: prodejní tlak do úrovně, flush pod úroveň, návrat nad ni s tečkou, potvrzení C1, retest R s vyšším low, potvrzení C2 a růst." style="color: var(--ink)">
+          <!-- reference level -->
+          <line x1="20" y1="230" x2="700" y2="230" stroke="currentColor" stroke-dasharray="6 5" opacity="0.55"/>
+          <text x="24" y="222" font-size="12" class="t-muted" font-family="IBM Plex Sans, Arial, sans-serif">VWAP předchozí session</text>
+          <!-- low of the reversal, reference for the retest -->
+          <line x1="300" y1="262" x2="640" y2="262" stroke="currentColor" stroke-dasharray="2 4" opacity="0.5"/>
+          <text x="646" y="266" font-size="11" class="t-muted" font-family="IBM Plex Sans, Arial, sans-serif">low reversalu</text>
+          <text x="122" y="58" font-size="12" text-anchor="middle" class="t-muted" font-family="IBM Plex Sans, Arial, sans-serif">prodejní tlak (A)</text>
+
+          <!-- candles: x = 60 + i*62, body width 20 -->
+          <g stroke-width="1.5">
+            <line x1="60" y1="72" x2="60" y2="118" class="s-bear"/><rect x="50" y="80" width="20" height="32" class="c-bear"/>
+            <line x1="122" y1="106" x2="122" y2="152" class="s-bear"/><rect x="112" y="112" width="20" height="34" class="c-bear"/>
+            <line x1="184" y1="140" x2="184" y2="196" class="s-bear"/><rect x="174" y="146" width="20" height="44" class="c-bear"/>
+            <line x1="246" y1="186" x2="246" y2="262" class="s-bear"/><rect x="236" y="190" width="20" height="60" class="c-bear"/>
+            <line x1="308" y1="208" x2="308" y2="262" class="s-bull"/><rect x="298" y="214" width="20" height="36" class="c-bull"/>
+            <line x1="370" y1="166" x2="370" y2="220" class="s-bull"/><rect x="360" y="172" width="20" height="42" class="c-bull"/>
+            <line x1="432" y1="168" x2="432" y2="248" class="s-bear"/><rect x="422" y="172" width="20" height="50" class="c-bear"/>
+            <line x1="494" y1="150" x2="494" y2="228" class="s-bull"/><rect x="484" y="156" width="20" height="66" class="c-bull"/>
+            <line x1="556" y1="110" x2="556" y2="160" class="s-bull"/><rect x="546" y="116" width="20" height="40" class="c-bull"/>
+            <line x1="618" y1="84" x2="618" y2="122" class="s-bull"/><rect x="608" y="92" width="20" height="24" class="c-bull"/>
+          </g>
+
+          <!-- marks -->
+          <circle cx="308" cy="276" r="5" class="c-bull"/>
+          <circle cx="308" cy="276" r="8" fill="none" class="s-bull" stroke-width="1.2"/>
+          <rect x="357" y="236" width="26" height="18" rx="2" class="c-bull"/>
+          <text x="370" y="249" text-anchor="middle" class="t-white" font-size="12" font-weight="700" font-family="IBM Plex Sans, Arial, sans-serif">C1</text>
+          <rect x="419" y="264" width="26" height="18" rx="2" class="c-bull"/>
+          <text x="432" y="277" text-anchor="middle" class="t-white" font-size="12" font-weight="700" font-family="IBM Plex Sans, Arial, sans-serif">R</text>
+          <rect x="481" y="244" width="26" height="18" rx="2" class="c-bull"/>
+          <text x="494" y="257" text-anchor="middle" class="t-white" font-size="12" font-weight="700" font-family="IBM Plex Sans, Arial, sans-serif">C2</text>
+
+          <!-- step labels -->
+          <g font-size="11.5" class="t-muted" font-family="IBM Plex Sans, Arial, sans-serif" text-anchor="middle">
+            <text x="246" y="312">1 flush</text>
+            <text x="308" y="312">2 návrat</text>
+            <text x="370" y="312">3 potvrzení</text>
+            <text x="432" y="312">4 retest</text>
+            <text x="494" y="312">5 potvrzení</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Typický bullish případ. Prodejci tlačí cenu do úrovně, poslední svíčka (1) úroveň prorazí s extrémní prodejní deltou. Další svíčka (2) se vrátí nad úroveň: prodejci zůstali chyceni pod ní, proto tečka. Svíčka (3) ukáže, že kupci převzali iniciativu (C1). Pullback (4) nedojde až na low reversalu a prodává se v něm slabě (R). Po retestu může přijít druhé potvrzení (5, C2). Bearish je přesné zrcadlo.</figcaption>
+    </figure>
+  </section>
+
+  <section aria-labelledby="najeti">
+    <h2 id="najeti">Co řekne tooltip</h2>
+    <p>Po najetí myší na tečku uvidíš, proč tam je. Každý řádek je jedna podmínka obratu. <span class="mono">●</span> znamená splněno, <span class="mono">○</span> nesplněno nebo jen částečně.</p>
+    <div class="tooltip" role="img" aria-label="Ukázka tooltipu bullish reversalu se skórem 84">▲ BULLISH REVERSAL   skóre 84 (silný)
+<span class="dim">Úspěšnost podobných signálů (T1 před stopem): 41 %</span>
+Úroveň: VWAP předchozí session 7753,66  (+1 další úroveň)
+Varianta: 2-bar (flush + návrat)
+
+<span class="g">●</span> A prodejní tlak předtím: pohyb 2,9× ATR, delta z -2,6
+<span class="g">●</span> B test úrovně: 3 t za úroveň
+<span class="g">●</span> C sweep a rychlý návrat: vybral předchozí lowy, návrat po 1 sv.
+○ D divergence delty: ne
+<span class="g">●</span> E absorpce u lowu: POC 22 % cesty od lowu, objem 91. percentil
+○ F vyčerpání na lowu: prodejci slábnou k lowu, na samém lowu 31 % průměru
+<span class="g">●</span> G close: 83 % cesty od lowu k highu
+<span class="g">●</span> H selhaný flush (prodejci chyceni): delta z -3,1, objem 96. pct</div>
+    <p class="muted">Řádek „Úspěšnost podobných signálů" se ukáže jen s nahraným kalibračním souborem. Je to naměřené číslo z historie (kolik podobných signálů došlo k T1 dřív než ke stopu), ne odhad. U čtverečků C a R tooltip vypíše, co přesně svíčka splnila, a cenu VPOC, kam se dá dát limitní příkaz.</p>
+  </section>
+
+  <section aria-labelledby="jak-funguje">
+    <h2 id="jak-funguje">Jak agent přemýšlí</h2>
+    <p>Pracuje ve třech krocích. Reversal je jen kontext, do obchodu se jde teprve po potvrzení nebo na retestu.</p>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 740 230" role="img" aria-label="Stavový diagram: reversal, čekání na potvrzení, C1, retest, C2; nové low zruší kontext v kterémkoli stavu." style="color: var(--ink)">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+            <marker id="arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" class="c-bear"/>
+            </marker>
+          </defs>
+          <g font-family="IBM Plex Sans, Arial, sans-serif">
+            <!-- row 1 -->
+            <rect x="20" y="30" width="150" height="54" rx="6" class="box"/>
+            <circle cx="42" cy="57" r="5" class="c-bull"/>
+            <text x="56" y="53" font-size="13" font-weight="600" class="ink">Reversal</text>
+            <text x="56" y="71" font-size="11.5" class="t-muted">tečka na svíčce</text>
+
+            <rect x="220" y="30" width="170" height="54" rx="6" class="box"/>
+            <text x="305" y="53" font-size="13" font-weight="600" text-anchor="middle" class="ink">Čeká na potvrzení</text>
+            <text x="305" y="71" font-size="11.5" text-anchor="middle" class="t-muted">max 6 svíček</text>
+
+            <rect x="440" y="30" width="130" height="54" rx="6" class="box"/>
+            <rect x="454" y="48" width="24" height="17" rx="2" class="c-bull"/>
+            <text x="466" y="61" text-anchor="middle" class="t-white" font-size="11" font-weight="700">C1</text>
+            <text x="488" y="53" font-size="13" font-weight="600" class="ink">Potvrzení</text>
+            <text x="488" y="71" font-size="11.5" class="t-muted">iniciativa</text>
+
+            <!-- row 2 -->
+            <rect x="440" y="150" width="130" height="54" rx="6" class="box"/>
+            <rect x="454" y="168" width="24" height="17" rx="2" class="c-bull"/>
+            <text x="466" y="181" text-anchor="middle" class="t-white" font-size="11" font-weight="700">R</text>
+            <text x="488" y="173" font-size="13" font-weight="600" class="ink">Retest</text>
+            <text x="488" y="191" font-size="11.5" class="t-muted">vyšší low</text>
+
+            <rect x="610" y="150" width="110" height="54" rx="6" class="box"/>
+            <rect x="624" y="168" width="24" height="17" rx="2" class="c-bull"/>
+            <text x="636" y="181" text-anchor="middle" class="t-white" font-size="11" font-weight="700">C2</text>
+            <text x="656" y="173" font-size="13" font-weight="600" class="ink">Znovu</text>
+            <text x="656" y="191" font-size="11.5" class="t-muted">potvrzení</text>
+
+            <rect x="220" y="150" width="170" height="54" rx="6" class="box-bad"/>
+            <text x="305" y="173" font-size="13" font-weight="600" text-anchor="middle" class="ink">Kontext zrušen</text>
+            <text x="305" y="191" font-size="11.5" text-anchor="middle" class="t-muted">myšlenka padá</text>
+
+            <!-- arrows -->
+            <line x1="170" y1="57" x2="218" y2="57" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)"/>
+            <text x="194" y="48" font-size="11" text-anchor="middle" class="t-muted">close</text>
+            <line x1="390" y1="57" x2="438" y2="57" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)"/>
+            <text x="414" y="48" font-size="11" text-anchor="middle" class="t-muted">delta</text>
+            <line x1="505" y1="84" x2="505" y2="148" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)"/>
+            <text x="513" y="112" font-size="11" class="t-muted">pullback, slabá delta</text>
+            <text x="513" y="126" font-size="11" class="t-muted">(do 12 svíček)</text>
+            <line x1="570" y1="177" x2="608" y2="177" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar)"/>
+            <line x1="305" y1="84" x2="305" y2="148" class="s-bear" stroke-width="1.4" marker-end="url(#arb)"/>
+            <text x="297" y="112" font-size="11" text-anchor="end" class="t-muted">nové low pod tečkou</text>
+            <text x="297" y="126" font-size="11" text-anchor="end" class="t-muted">nebo opačný reversal</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Po tečce agent čeká nejvýš 6 svíček na potvrzení. Retest může přijít do 12 svíček a po něm se čekání na potvrzení obnoví (C2). Nové low pod tečkou (u bearish nové high) nebo opačný reversal zruší kontext v kterémkoli stavu. Když do 6 svíček nic nepřijde, kontext vyprší.</figcaption>
+    </figure>
+  </section>
+
+  <section aria-labelledby="tecka">
+    <h2 id="tecka">Kdy vznikne tečka</h2>
+    <p>Svíčka musí nejdřív projít třemi povinnými podmínkami. Když jednu nesplní, tečka nebude, ať je zbytek sebelepší.</p>
+    <div class="cols">
+      <div class="card"><span class="tag gate">povinné</span><h3>Předchozí tlak</h3><p>Za posledních 6 svíček pohyb aspoň 2× ATR proti směru obratu a aspoň jedna svíčka s extrémní deltou (z-score −2 nebo nižší).</p></div>
+      <div class="card"><span class="tag gate">povinné</span><h3>Úroveň</h3><p>Low se dotkne referenční úrovně nebo ji prorazí. Tolerance je 2 ticky nebo 0,15 ATR, podle toho, co je víc.</p></div>
+      <div class="card"><span class="tag gate">povinné</span><h3>Návrat</h3><p>Close je zpátky nad úrovní. Za úrovní smí zavřít nejvýš 2 svíčky, jinak ji trh přijal.</p></div>
+    </div>
+    <p>Pak agent spočítá skóre 0–100 z devíti komponent. Tečka se ukáže od skóre 60, silný reversal je od 75.</p>
+
+    <h3>Referenční úrovně</h3>
+    <p>VWAP předchozí session, session VWAP a jeho pásma ±1σ a ±2σ, high a low první RTH svíčky, opening range 15 a 30 minut a initial balance, RTH open, high, low, POC, VAH a VAL předchozího dne, overnight high a low, equal highs a lows (liquidity pool), výrazné swingy dne a tvoje ruční úrovně. Když se v toleranci potká víc úrovní, skóre úrovně roste.</p>
+
+    <h3>Devět komponent</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>Co hledá</th><th>Po lidsku</th><th class="num">Váha</th></tr></thead>
+        <tbody>
+          <tr><td class="key">A</td><td>Předchozí iniciativní pohyb</td><td>Někdo agresivně tlačil cenu do úrovně.</td><td class="num">8</td></tr>
+          <tr><td class="key">B</td><td>Kvalita úrovně a vzdálenost</td><td>Obrat přišel na místě, které trh respektuje.</td><td class="num">15</td></tr>
+          <tr><td class="key">C</td><td>Sweep a rychlost návratu</td><td>Vybral stopy pod předchozími lowy a hned se vrátil.</td><td class="num">12</td></tr>
+          <tr><td class="key">D</td><td>Divergence delty</td><td>Cena udělala nové low, ale prodeje už ne.</td><td class="num">8</td></tr>
+          <tr><td class="key">E</td><td>Absorpce u extrému</td><td>Dole se zobchodovalo hodně, POC je u low a cena přesto nepadá. Někdo velký nakupuje limitkami.</td><td class="num">15</td></tr>
+          <tr><td class="key">F</td><td>Vyčerpání</td><td>Prodeje k low slábnou, na samém low skoro nic. Aukce dole je dokončená.</td><td class="num">7</td></tr>
+          <tr><td class="key">G</td><td>Close</td><td>Svíčka zavřela v horní části svého rozsahu.</td><td class="num">7</td></tr>
+          <tr><td class="key">H</td><td>Selhaná iniciativa</td><td>Flush s extrémní prodejní deltou, další svíčka bez nového low a s kladnou deltou. Prodejci jsou chyceni. Jen u varianty 2-bar.</td><td class="num">15</td></tr>
+          <tr><td class="key">I</td><td>Stall</td><td>Několik svíček u úrovně, silné prodeje bez posunu ceny, pak spouštěč nahoru. Jen u varianty stall.</td><td class="num">13</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">Všechny prahy se měří proti tomu, co je pro danou denní dobu normální (stejný čas posledních 10 dní), a ceny v násobcích ATR. Objem 5 000 kontraktů je ve 3 ráno obří, hned po otevření RTH podprůměrný. Agent to rozliší.</p>
+  </section>
+
+  <section aria-labelledby="footprint">
+    <h2 id="footprint">Absorpce ve footprintu</h2>
+    <div class="fp">
+      <div class="cluster" role="img" aria-label="Ilustrace footprint svíčky s POC ve spodní třetině a slábnoucími prodeji u low">
+        <div class="hdr"><span>cena</span><span>bid</span><span>ask</span></div>
+        <div class="close"><span>7758,75</span><span>12</span><span>180</span></div>
+        <div><span>7758,50</span><span>40</span><span>210</span></div>
+        <div><span>7758,25</span><span>95</span><span>260</span></div>
+        <div><span>7758,00</span><span>160</span><span>310</span></div>
+        <div><span>7757,75</span><span>240</span><span>280</span></div>
+        <div><span>7757,50</span><span>420</span><span>390</span></div>
+        <div class="poc hot"><span>7757,25</span><span>610</span><span>520</span></div>
+        <div class="hot"><span>7757,00</span><span>380</span><span>300</span></div>
+        <div><span>7756,75</span><span>150</span><span>90</span></div>
+        <div><span>7756,50</span><span>22</span><span>8</span></div>
+      </div>
+      <div style="display: grid; gap: 12px;">
+        <p>Ilustrace bullish reversal svíčky (bid = agresivní prodeje, ask = agresivní nákupy):</p>
+        <ul>
+          <li><strong>E absorpce:</strong> POC (orámovaný) leží ve spodní třetině svíčky. Prodejci tam poslali 610 kontraktů a cena přesto neklesla.</li>
+          <li><strong>F vyčerpání:</strong> směrem k low prodeje slábnou (610 → 380 → 150 → 22). Na samém low už skoro nikdo neprodává.</li>
+          <li><strong>G close:</strong> svíčka zavřela úplně nahoře.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="potvrzeni">
+    <h2 id="potvrzeni">Kdy vznikne C1, C2 a R</h2>
+    <div class="cols">
+      <div class="card">
+        <h3>C1 / C2 · potvrzení</h3>
+        <ul>
+          <li>přijde do 6 svíček po tečce nebo po retestu</li>
+          <li>žádné nové low pod tečkou</li>
+          <li>kladná delta (z-score aspoň +1, nebo aspoň 30 % nejsilnější prodejní svíčky pohybu)</li>
+          <li>close v horních 40 % svíčky a nad close předchozí svíčky</li>
+          <li>cena se opravdu pohnula (efektivita aspoň 40. percentil)</li>
+        </ul>
+        <p class="muted">Body navíc: 3+ ask imbalance v řadě, vysoký objem, close nad high reversalu. Srážka: POC nahoře a prodej nad ním.</p>
+      </div>
+      <div class="card">
+        <h3>R · retest</h3>
+        <ul>
+          <li>do 12 svíček po tečce</li>
+          <li>nejnižší low od reversalu, ale vyšší než low tečky, nejvýš o 0,3 ATR</li>
+          <li>slabá delta: nejvýš 40 % nejsilnější prodejní svíčky pohybu</li>
+        </ul>
+        <p class="muted">Říká: prodejci se vrátili k místu, kde prohráli, a už nemají sílu. Po retestu může přijít C2.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="data">
+    <h2 id="data">Co říkají data</h2>
+    <p>Agent jsem pustil přes 137 609 skutečných M5 svíček ES (tick data s rozlišením nákup/prodej, 07/2024–06/2026). Kalibrace se učila jen na starší části. Novější část (10/2025–06/2026) nikdy neviděla, a proto je to férový test.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Způsob vstupu</th><th class="num">Starší data</th><th class="num">Test</th><th>Závěr</th></tr></thead>
+        <tbody>
+          <tr><td>Jen tečka</td><td class="num">≈ 0 R</td><td class="num">≈ 0 R</td><td>Kontext, ne vstup</td></tr>
+          <tr><td>Trhem na close C1/C2</td><td class="num">−0,03 R</td><td class="num">0,00 R</td><td>Bez výhody</td></tr>
+          <tr><td>Limit na VPOC svíčky C1/C2, RTH</td><td class="num">+0,06 R</td><td class="num">+0,05 R</td><td>Kolem nuly</td></tr>
+          <tr><td>Limit na VPOC svíčky R, RTH</td><td class="num good">+0,32 R</td><td class="num good">+0,81 R</td><td class="good">Nejsilnější, 53 % a 72 % úspěšných</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">R = násobek rizika (1 R = vzdálenost ke stopu pod low tečky), výstup na 1,5 R. Poplatky nejsou započtené (asi 0,05–0,1 R na obchod). Zobrazená úspěšnost v tooltipu na testu seděla: kde ukazovala 37 %, bylo naměřeno 38 %.</p>
+    <p class="note">Minulost nezaručuje budoucnost. Dva roky jednoho trhu jsou solidní vzorek, ale ne jistota. Ber agenta jako druhý pár očí, ne jako automat.</p>
+  </section>
+
+  <section aria-labelledby="pouziti">
+    <h2 id="pouziti">Jak s ním pracovat</h2>
+    <ol class="steps">
+      <li><div><strong>Tvůj plán je první.</strong> Máš úroveň, kde čekáš obrat. Agent ti řekne, jestli orderflow na ní obrat opravdu ukazuje.</div></li>
+      <li><div><strong>Tečka = pozor, nic víc.</strong> Najeď na ni a podívej se, co svítí. Nejvíc vypovídají H (chycení prodejci), E (absorpce), C (sweep) a G (close).</div></li>
+      <li><div><strong>Bez čtverečku nevstupuj.</strong> C1 ukáže, že iniciativu převzala druhá strana.</div></li>
+      <li><div><strong>Nejlepší je R.</strong> Retest s vyšším low a slabou deltou. Úroveň pro limit (VPOC svíčky) je v tooltipu, stop patří pod low tečky.</div></li>
+      <li><div><strong>Nové low pod tečkou = konec.</strong> Obchodní myšlenka padla, nečekej na zázrak.</div></li>
+      <li><div><strong>Pozor na zprávy.</strong> V okně ±5 minut kolem 8:30, 10:00 a 14:00 ET se orderflow čte špatně. Tooltip na to upozorní.</div></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="nastaveni">
+    <h2 id="nastaveni">Nastavení, na která možná sáhneš</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Parametr</th><th>Výchozí</th><th>Kdy změnit</th></tr></thead>
+        <tbody>
+          <tr><td>Tečka: min. skóre k zobrazení</td><td class="mono">60</td><td>75 = uvidíš jen silné reversaly</td></tr>
+          <tr><td>Signály v session</td><td class="mono">ETH</td><td>RTH, pokud obchoduješ jen 15:30–22:00 našeho času</td></tr>
+          <tr><td>Alert: potvrzení C1/C2 · retest R</td><td class="mono">zapnuto</td><td>Zvuk a popup, když vznikne čtvereček</td></tr>
+          <tr><td>Alert: reversal (tečka)</td><td class="mono">vypnuto</td><td>Zapni, pokud chceš vědět už o tečce (standardně jen silné)</td></tr>
+          <tr><td>Kreslit vstupní zóny · stop a targety</td><td class="mono">vypnuto</td><td>Jen pokud chceš vidět zóny a SL/TP čáry</td></tr>
+          <tr><td>Ruční úrovně</td><td class="mono">prázdné</td><td>Tvoje vlastní ceny oddělené středníkem, např. <span class="mono">7750;7735,5</span></td></tr>
+          <tr><td>Kalibrační JSON</td><td class="mono">calibration.json</td><td>Bez něj tooltip neukáže naměřenou úspěšnost</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">Časy session se počítají v newyorském čase, takže RTH open (15:30 u nás) sedí i v týdnech, kdy USA a Evropa mění čas v jiný den.</p>
+  </section>
+
+  <section aria-labelledby="slovnik">
+    <h2 id="slovnik">Slovníček</h2>
+    <dl>
+      <dt>Delta</dt><dd>Agresivní nákupy minus agresivní prodeje ve svíčce (ask − bid).</dd>
+      <dt>z-score</dt><dd>Kolik „normálních výkyvů" je hodnota od průměru pro tuhle denní dobu. −2 znamená výjimečně silné prodeje.</dd>
+      <dt>Percentil</dt><dd>Objem 90. percentil = vyšší než u 90 % svíček ve stejnou dobu.</dd>
+      <dt>POC / VPOC</dt><dd>Cena s největším zobchodovaným objemem ve svíčce.</dd>
+      <dt>Absorpce</dt><dd>Agresivní prodeje narážejí na velké pasivní nákupy a cena nepadá.</dd>
+      <dt>Sweep</dt><dd>Cena krátce prorazí předchozí low, vybere stopy a vrátí se.</dd>
+      <dt>Flush</dt><dd>Prudká svíčka s extrémní prodejní deltou, často kapitulace.</dd>
+      <dt>Imbalance</dt><dd>Diagonální převaha: na ceně je aspoň 3× víc nákupů než prodejů o tick níž.</dd>
+      <dt>ATR</dt><dd>Průměrný rozsah svíčky za posledních 14 svíček. Měřítko „normálního" pohybu.</dd>
+      <dt>RTH / ETH</dt><dd>Hlavní seance 9:30–16:00 New York (15:30–22:00 Praha) / celý elektronický den.</dd>
+      <dt>VWAP</dt><dd>Průměrná cena vážená objemem od začátku session.</dd>
+      <dt>R</dt><dd>Jednotka rizika. 1 R = vzdálenost od vstupu ke stopu.</dd>
+    </dl>
+  </section>
+
+  <hr>
+  <p class="muted" style="font-size: 0.88rem;">Reversal &amp; Confirmation Entry pro ATAS. Kód, návod k instalaci a podrobný backtest jsou v repozitáři ecko456/-analyzator-trhu (README.md, docs/BACKTEST.md, docs/DESIGN.md).</p>
+</div>
+
+</html>

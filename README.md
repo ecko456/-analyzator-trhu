@@ -39,19 +39,19 @@ Poplatky nejsou započtené (~0,05–0,1 R na obchod). Test je období, které k
 
 ## Co indikátor kreslí
 
+Výchozí zobrazení je minimalistické: agent jen označí svíčky, které nejlépe splňují podmínky obratu. Srozumitelný popis všeho najdeš v brožurce [docs/Brozurka.html](docs/Brozurka.html) (otevři v prohlížeči).
+
 | značka | význam |
 |---|---|
-| malá tečka pod low / nad high | reversal (kontext); větší = silný (≥ 75). V režimu *Vše* s šipkou a skóre |
-| **C1 / C2** | potvrzující svíčka (max 2 na kontext) |
-| **R** | retest: vyšší low do 0,3 ATR od extrému se slabou deltou |
-| obdélník | limitní zóna od vzniku do vypršení (Q = 6 svíček), sytost podle skóre, šedá = vypršela / zrušena, rámeček = vyplněná. Popisek: skóre · změřená pravděpodobnost |
-| čáry SL / T1 / T2 / T3 / 1.5R / 2R | stop a targety od fillu; ✓ = target dosažen |
-| **×** | kontext zrušen (nový extrém za reversalem, opačný reversal) |
-| **!** | po vstupu absorpce selhala (close pod VPOC reversalu se silnou protisměrnou deltou) |
+| tečka pod low / nad high | reversal (kontext). Velikost a sytost rostou se skóre (60–70 / 70–80 / 80+), kroužek = silný (≥ 75) |
+| čtvereček **C1 / C2** | potvrzující svíčka: druhá strana převzala iniciativu (max 2 na reversal) |
+| čtvereček **R** | retest: vyšší low (u bearish nižší high) blízko extrému se slabou deltou, v datech nejlepší místo pro vstup |
 
-Najetí myší na značku nebo zónu zobrazí tooltip: skóre, pravděpodobnost, komponenty A–I, úroveň, variantu, stop a targety, směr vůči VWAP trendu. Panel vlevo nahoře ukazuje statistiku vyplněných zón podle skóre (n, T1 %, R) a podle typu zóny.
+Najetí myší na značku zobrazí tooltip v češtině: skóre, naměřenou úspěšnost (s kalibrací), úroveň, variantu a všech devět podmínek A–I s ● (splněno) / ○ (ne) a konkrétními čísly. U C1/C2 a R je v tooltipu i cena VPOC svíčky pro případný limit.
 
-Alerty (zvuk + popup, každý zvlášť): nová zóna, fill zóny, zrušení kontextu se zónou / absorpce selhala, volitelně dotyk zóny v průběhu svíčky a reversal.
+Volitelně (v sekci *9. Zobrazení*, ve výchozím stavu vypnuté): vstupní zóny, čáry stopu a targetů, značky × (kontext zrušen) a ! (absorpce selhala), statistický panel, referenční úrovně.
+
+Alerty (zvuk + popup): ve výchozím stavu potvrzení C1/C2 a retest R. Volitelně reversal (standardně jen silné), zóny, fill, dotyk zóny, zrušení kontextu.
 
 ## Parametry (výchozí hodnoty)
 
@@ -77,7 +77,9 @@ Alerty (zvuk + popup, každý zvlášť): nová zóna, fill zóny, zrušení kon
 | | T1 origin · T2 VWAP · T3 úroveň · min. poměr k T1 | zapnuto · zapnuto · zapnuto · 1,2 R |
 | Filtry šumu | okno zpráv potlačit · mrtvý trh | ne · ano (< 20. percentil objemu) |
 | Logování | CSV · složka · kalibrace · kalibrované váhy | ano · `%APPDATA%\ATAS\ReversalConfirmation\logs` · `…\calibration.json` · ne |
-| Zobrazení | režim | Jen vstupy |
+| Zobrazení | tečka od skóre · C1/C2 · R · tooltip | 60 · ano · ano · ano |
+| | zóny · stop/targety · × · ! · panel · úrovně | ne |
+| Alerty | potvrzení C1/C2 · retest R · reversal · zóny/fill/zrušení | ano · ano · ne · ne |
 
 Všechny prahy jsou percentily, z-score (proti stejnému času dne za posledních 10 dní, s rolling fallbackem) nebo násobky ATR s minimem v ticích. Žádný práh není v kontraktech.
 

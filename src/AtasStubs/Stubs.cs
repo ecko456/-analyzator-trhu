@@ -176,6 +176,7 @@ namespace OFT.Rendering.Context
         public void DrawRectangle(RenderPen pen, Rectangle rect) { }
         public void DrawLine(RenderPen pen, int x1, int y1, int x2, int y2) { }
         public void FillEllipse(Color color, Rectangle rect) { }
+        public void DrawEllipse(RenderPen pen, Rectangle rect) { }
         public void FillPolygon(Color color, Point[] points) { }
         public void DrawString(string text, RenderFont font, Color color, int x, int y) { }
         public void DrawString(string text, RenderFont font, Color color, Rectangle rect, RenderStringFormat format) { }

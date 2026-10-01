@@ -205,7 +205,7 @@ namespace ReversalConfirmation.Tests
             var e = Run(sc.S.Bars, st);
             var rev = e.Marks.Single(m => m.Type == MarkType.Reversal && m.Bar == sc.RevBar);
             Assert.Contains("stall", rev.Tooltip);
-            Assert.Contains("I=", rev.Tooltip);
+            Assert.Contains("● I stall (absorpce)", rev.Tooltip);
         }
 
         [Fact]
