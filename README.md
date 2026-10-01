@@ -25,6 +25,12 @@ Poplatky nejsou započtené (~0,05–0,1 R na obchod). Test je období, které k
 
 ## Instalace (Windows)
 
+**Nejjednodušší:** nainstaluj [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (jednou), zavři ATAS a dvojklikni na **`instalace.bat`** v kořeni složky. Skript indikátor sestaví proti tvé instalaci ATAS, zkopíruje ho do `%APPDATA%\ATAS\Indicators` a přidá kalibraci. Pak spusť ATAS a přidej indikátor **Reversal & Confirmation Entry**.
+
+Hotová DLL ke stažení není: indikátor se musí sestavit proti knihovnám tvé verze ATAS (trvá to asi minutu).
+
+Ručně:
+
 1. Nainstaluj [ATAS](https://atas.net) do výchozí složky a [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 2. V kořeni repozitáře spusť:
    ```bat
