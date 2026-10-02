@@ -12,6 +12,17 @@ namespace ReversalConfirmation.Core
         Rth
     }
 
+    /// <summary>The part of the day the trader trades. Signals, contexts and calibration are kept inside it.</summary>
+    public enum TradeWindow
+    {
+        /// <summary>US session on the trader's clock (default 15:30–22:12 Prague = 09:30–16:12 New York).</summary>
+        Rth,
+        /// <summary>European morning on the trader's clock (default 08:00–15:00 Prague).</summary>
+        Eth,
+        /// <summary>Whole Globex day (as in the original spec).</summary>
+        All
+    }
+
     public enum AtrMode
     {
         /// <summary>Wilder ATR(14) of the chart timeframe, exactly as in the spec.</summary>
@@ -57,8 +68,26 @@ namespace ReversalConfirmation.Core
         public string NewsTimes = "08:30;10:00;14:00";
         public int NewsWindowMinutes = 5;
         public bool SuppressNewsSignals = false;
-        /// <summary>Session in which new reversals may be signalled (ETH = all hours, as in the spec; RTH = 09:30–16:00 ET only).</summary>
-        public SessionMode SignalSession = SessionMode.Eth;
+
+        // ---------------- Trading window (trader's clock) ----------------
+        /// <summary>
+        /// Window in which reversals, confirmations and entries are signalled. RTH and the European morning have
+        /// different volatility and volume, so each window has its own calibration; bars outside it only feed
+        /// levels and statistics.
+        /// </summary>
+        public TradeWindow Window = TradeWindow.Rth;
+        /// <summary>Trader's time zone for the window times below.</summary>
+        public string LocalTimeZoneId = "Europe/Prague";
+        /// <summary>
+        /// RTH window on the trader's clock. It is anchored to the exchange: the times are converted with the normal
+        /// (standard-time) difference to <see cref="TimeZoneId"/>, so in the weeks when the US and Europe change
+        /// clocks on different dates the window moves with New York (e.g. 14:30 Prague instead of 15:30).
+        /// </summary>
+        public TimeSpan RthWindowFrom = new TimeSpan(15, 30, 0);
+        public TimeSpan RthWindowTo = new TimeSpan(22, 12, 0);
+        /// <summary>ETH (European morning) window on the trader's clock.</summary>
+        public TimeSpan EthWindowFrom = new TimeSpan(8, 0, 0);
+        public TimeSpan EthWindowTo = new TimeSpan(15, 0, 0);
         public bool DeadMarketFilter = true;
         public double DeadMarketPercentile = 20;
 
@@ -156,6 +185,38 @@ namespace ReversalConfirmation.Core
         public int Conf_ImbalanceCount = 3;
         public double Conf_VolumePct = 60;
         public double Conf_MinScore = 60;
+        /// <summary>
+        /// Confirmation requires a break of structure (BOS): bullish = close above the first pivot high found going
+        /// left from the reversal low (a candle whose high sticks out above the candle to its left); if the low
+        /// candle itself is an outside bar (new low and high above the previous candle), its own high is the level.
+        /// Bearish is the mirror.
+        /// </summary>
+        public bool RequireBos = true;
+        /// <summary>true = the break needs a close beyond the level, false = a wick through it is enough.</summary>
+        public bool BosOnClose = true;
+        /// <summary>
+        /// An order-flow confirmation without the break yet stays pending this long; when the BOS comes within it the
+        /// confirmation becomes valid on the breaking candle, otherwise it expires.
+        /// </summary>
+        public int BosWaitMinutes = 30;
+        public int BosLookback = 40;
+        /// <summary>Fibo entry without a confirmation: how long after the extreme the BOS may come.</summary>
+        public int BosMaxBars = 24;
+
+        // ---------------- Fibo entry after BOS (návrat do F5 / F7) ----------------
+        /// <summary>After the BOS, mark the first return into the F5–F7 retracement of the impulse A→B.</summary>
+        public bool FiboEntry = true;
+        public double FibF5 = 0.618;
+        public double FibF7 = 0.789;
+        /// <summary>Bars after the BOS within which the return must come.</summary>
+        public int FibMaxBars = 36;
+        /// <summary>0 = a touch of F5/F7 counts as filled, 1 = price must trade one tick through (conservative).</summary>
+        public int FibFillThroughTicks = 0;
+        /// <summary>
+        /// The F mark needs a valid order-flow confirmation (C1/C2) first. Off by default: in the 2024–2026 back-test
+        /// the F7 entry after the BOS was not better with the order-flow confirmation (docs/BACKTEST.md).
+        /// </summary>
+        public bool FiboRequireConf = false;
 
         // ---------------- Zones ----------------
         public ZoneTypes Zones = ZoneTypes.ConfirmationVpoc | ZoneTypes.Retest;

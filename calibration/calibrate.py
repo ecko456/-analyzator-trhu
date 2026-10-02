@@ -203,11 +203,18 @@ def main():
     ap.add_argument("--l2", type=float, default=10.0)
     ap.add_argument("--min-samples", type=int, default=30)
     ap.add_argument("--train-until", default=None, help="ignore rows at/after this UTC date (keep them as a hold-out)")
+    ap.add_argument("--window", choices=["rth", "eth"], default=None,
+                    help="keep only signals inside this trading window (log column 'window'); RTH and the European "
+                         "morning differ in volatility and volume, so each gets its own calibration")
     a = ap.parse_args()
 
     df = load(a.logs)
     if a.train_until:
         df = df[df["t"] < pd.Timestamp(a.train_until)]
+    if a.window:
+        if "window" not in df.columns:
+            sys.exit("log has no 'window' column - re-run the replay with the current version")
+        df = df[df["window"].astype(str).str.lower() == a.window]
     rev = df[df["kind"] == "REV"].reset_index(drop=True)
     zone = df[(df["kind"] == "ZONE") & (pd.to_numeric(df["filled"], errors="coerce") == 1)].reset_index(drop=True)
     print(f"period {df['t'].min()} .. {df['t'].max()} | REV {len(rev)} | filled zones {len(zone)} | label {a.label}")
@@ -257,6 +264,7 @@ def main():
         "version": 2,
         "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "label": a.label,
+        "window": a.window or "",
         "source": [str(x) for x in a.logs],
         "period": [str(df["t"].min()), str(df["t"].max())],
         "min_samples": a.min_samples,

@@ -19,6 +19,8 @@ namespace ReversalConfirmation.Core
 
         public readonly List<Mark> Marks = new List<Mark>();
         public readonly List<Zone> Zones = new List<Zone>();
+        /// <summary>Pivots that reversals have to break (BOS); dotted lines on the chart.</summary>
+        public readonly List<StructureLine> Structures = new List<StructureLine>();
         public readonly List<EngineEvent> Events = new List<EngineEvent>();
         public readonly BucketStats ReversalStats = new BucketStats();
         public readonly BucketStats ZoneStats = new BucketStats();
@@ -48,6 +50,7 @@ namespace ReversalConfirmation.Core
         private long _session = long.MinValue;
         private double _cvd;
         private int _nextId = 1;
+        private readonly int _bosWaitBars;
 
         public ReversalEngine(EngineSettings settings, double tick, double barMinutes, ILogSink log = null, Calibration calibration = null)
         {
@@ -67,9 +70,21 @@ namespace ReversalConfirmation.Core
             _effInit = new SortedWindow(S.DistributionWindow);
             _levels = new LevelTracker(S, tick, barMinutes);
             _det = new Detector(S, tick, _bars, _stats, _thirdShares, _eff4);
+            _bosWaitBars = barMinutes > 0 ? Math.Max(0, (int)Math.Round(S.BosWaitMinutes / barMinutes)) : Math.Max(0, S.P_Bars);
         }
 
+        /// <summary>Bars an order-flow confirmation may wait for the break of structure.</summary>
+        public int BosWaitBars => _bosWaitBars;
+
         public BarStat StatOf(int bar) => _stats.TryGet(bar);
+
+        /// <summary>Keeps <see cref="Marks"/> sorted by bar (a break found at the reversal may lie a bar or two back).</summary>
+        private void AddMark(Mark m)
+        {
+            int i = Marks.Count;
+            while (i > 0 && Marks[i - 1].Bar > m.Bar) i--;
+            Marks.Insert(i, m);
+        }
 
         // =====================================================================================
         public void OnBar(Bar b)
@@ -235,8 +250,7 @@ namespace ReversalConfirmation.Core
             {
                 // negative samples: real candidates (initiative present) or near misses that only lack part of it
                 bool nearMiss = !c.GateA && c.HasLevel && c.Reclaimed && c.SpeedOk && c.DropAtr >= 0.5 * S.A_DropAtr;
-                bool inSession = S.SignalSession == SessionMode.Eth || _stats[t].T.IsRth;
-                if (c.Score >= S.LogMinScore && inSession && (c.GateA || nearMiss))
+                if (c.Score >= S.LogMinScore && _stats[t].T.InWindow && (c.GateA || nearMiss))
                     StartReversalTracker(c, t, "REJ", c.Reject, null);
                 return;
             }
@@ -244,7 +258,7 @@ namespace ReversalConfirmation.Core
             string reason = null;
             bool news = false;
             for (int i = c.First; i <= c.Last; i++) news |= _stats[i].T.News;
-            if (S.SignalSession == SessionMode.Rth && !_stats[t].T.IsRth) reason = "outside session";
+            if (!_stats[t].T.InWindow) reason = "outside window";
             else if (S.DeadMarketFilter && c.VolPct < S.DeadMarketPercentile) reason = "dead market";
             else if (S.SuppressNewsSignals && news) reason = "news";
 
@@ -255,7 +269,10 @@ namespace ReversalConfirmation.Core
                 if (x.Dir == c.Dir) same = x;
                 else opposite = x;
             }
-            if (reason == null && same != null && !(c.M.L < same.ExtremeO - 1e-9 || c.Score > same.Score))
+            // a stronger reversal replaces a context, unless that context already had an order-flow confirmation on an
+            // earlier candle (pending or valid): the trader is following that setup and its pivot
+            bool engaged = same != null && (same.Pending != null || same.ValidConfirmations > 0) && same.LastConfBar < t;
+            if (reason == null && same != null && !(c.M.L < same.ExtremeO - 1e-9 || (c.Score > same.Score && !engaged)))
                 reason = "context active";
 
             if (reason != null)
@@ -276,7 +293,23 @@ namespace ReversalConfirmation.Core
                 StopO = c.M.L - Math.Max(S.StopBufferTicks * Tick, S.StopBufferAtr * c.Atr),
                 Waiting = true, WaitStart = t, News = news
             };
+            ctx.BosO = _det.StructureLevel(c.Dir, c.ExtremeBar, out ctx.BosPivotBar, out ctx.BosAnomaly);
+            for (int i = c.ExtremeBar + 1; i <= t && ctx.BosBar < 0; i++)
+                if (BreaksStructure(ctx, _bars[i].Oriented(c.Dir))) ctx.BosBar = i;
+            if (ctx.BosBar >= 0)
+                for (int i = c.ExtremeBar; i <= t; i++) ctx.FibB = double.IsNaN(ctx.FibB) ? _bars[i].Oriented(c.Dir).H : Math.Max(ctx.FibB, _bars[i].Oriented(c.Dir).H);
+            if (S.RequireBos)
+            {
+                ctx.Line = new StructureLine
+                {
+                    ContextId = ctx.Id, Dir = c.Dir, PivotBar = ctx.BosPivotBar, ReversalBar = t, Price = c.Dir * ctx.BosO,
+                    Score = c.Score, Anomaly = ctx.BosAnomaly, EndBar = ctx.BosBar >= 0 ? ctx.BosBar : t, BreakBar = ctx.BosBar,
+                    Live = ctx.BosBar < 0
+                };
+                Structures.Add(ctx.Line);
+            }
             _contexts.Add(ctx);
+            if (ctx.BosBar >= 0) StructureBroken(ctx, ctx.BosBar);
 
             // the row carries every feature the calibrated model may use
             var revRow = BuildReversalRow(c, t, "REV", null, ctx);
@@ -295,7 +328,7 @@ namespace ReversalConfirmation.Core
                 Score = c.Score, Strong = c.Score >= S.StrongScore, ContextId = ctx.Id, Probability = prob,
                 Tooltip = ReversalTooltip(c, prob, news)
             };
-            Marks.Add(mark);
+            AddMark(mark);
             Events.Add(new EngineEvent
             {
                 Type = EngineEventType.Reversal, Bar = t, Dir = c.Dir, Price = c.ExtremeReal, Score = c.Score,
@@ -344,9 +377,28 @@ namespace ReversalConfirmation.Core
             public Candidate Cand;
             public double Score, ExtremeO, RevHighO, RevPocO, RefDelta, OriginO, Atr, StopO;
             public bool Waiting, RetestDone, InTrade, AbsorptionWarned, Done, News;
+            public double BosO;                 // oriented structure level (bullish: last lower high)
+            public int BosPivotBar, BosBar = -1; // bar of the pivot / bar that broke it (-1 = not yet)
+            public bool BosAnomaly;
+            public double FibB = double.NaN;    // oriented impulse high A→B, frozen at the F5 entry
+            public bool FibF5Done, FibF7Done, FibExpired;
+            public int ValidConfirmations;
+            public PendingConf Pending;         // order flow confirmed, waiting for the BOS
+            public StructureLine Line;
+            public Mark BosMark;
             public readonly List<Zone> Zones = new List<Zone>();
             public LogRow RevRow;
         }
+
+        private sealed class PendingConf
+        {
+            public int Bar;
+            public string Label;
+            public ConfResult Conf;
+            public Mark Mark;
+        }
+
+        private bool BreaksStructure(Context ctx, OBar b) => (S.BosOnClose ? b.C : b.H) > ctx.BosO + 1e-9;
 
         private void UpdateContext(Context ctx, int t)
         {
@@ -354,6 +406,13 @@ namespace ReversalConfirmation.Core
             var ob = _bars[t].Oriented(ctx.Dir);
             var st = _stats[t];
             double z = ctx.Dir * st.DeltaZ;
+
+            // nothing is signalled outside the trading window (other hours have other volatility and volume)
+            if (!st.T.InWindow)
+            {
+                Close(ctx, t, "window end", false);
+                return;
+            }
 
             // a new extreme beyond the reversal invalidates the context in any state
             if (ob.L < ctx.ExtremeO - 1e-9)
@@ -380,7 +439,7 @@ namespace ReversalConfirmation.Core
             if (ctx.InTrade && !ctx.AbsorptionWarned && ob.C < ctx.RevPocO && z <= -S.AbsorptionFailZ)
             {
                 ctx.AbsorptionWarned = true;
-                Marks.Add(new Mark
+                AddMark(new Mark
                 {
                     Bar = t, Dir = ctx.Dir, Type = MarkType.AbsorptionFailed, Label = "!",
                     Price = ctx.Dir > 0 ? _bars[t].Low : _bars[t].High, ContextId = ctx.Id,
@@ -400,7 +459,7 @@ namespace ReversalConfirmation.Core
                 if (higherLow && pullback && quiet)
                 {
                     ctx.RetestDone = true;
-                    Marks.Add(new Mark
+                    AddMark(new Mark
                     {
                         Bar = t, Dir = ctx.Dir, Type = MarkType.Retest, Label = "R",
                         Price = ctx.Dir > 0 ? _bars[t].Low : _bars[t].High, ContextId = ctx.Id, Score = ctx.Score,
@@ -413,7 +472,7 @@ namespace ReversalConfirmation.Core
                     });
                     if ((S.Zones & ZoneTypes.Retest) != 0)
                         CreateZone(ctx, t, ZoneTypes.Retest, ob.Poc, ctx.Score, double.NaN, null);
-                    if (ctx.Confirmations < S.MaxConfirmations)
+                    if (ctx.Confirmations < S.MaxConfirmations && ctx.Pending == null)
                     {
                         ctx.Waiting = true;
                         ctx.WaitStart = t;
@@ -421,8 +480,30 @@ namespace ReversalConfirmation.Core
                 }
             }
 
+            // break of structure (registered before the confirmation check: the breaking candle may confirm)
+            if (ctx.BosBar < 0 && BreaksStructure(ctx, ob))
+            {
+                ctx.BosBar = t;
+                for (int i = ctx.Cand.ExtremeBar; i <= t; i++)
+                    ctx.FibB = double.IsNaN(ctx.FibB) ? _bars[i].Oriented(ctx.Dir).H : Math.Max(ctx.FibB, _bars[i].Oriented(ctx.Dir).H);
+                if (ctx.Line != null)
+                {
+                    ctx.Line.BreakBar = t;
+                    ctx.Line.EndBar = t;
+                    ctx.Line.Live = false;
+                }
+                StructureBroken(ctx, t);
+            }
+            else if (S.FiboEntry && ctx.BosBar >= 0 && t > ctx.BosBar) UpdateFibo(ctx, t, ob);
+
+            if (ctx.Pending != null)
+            {
+                // order flow already confirmed: valid on the breaking candle, expired after the wait
+                if (ctx.BosBar >= 0) ValidatePending(ctx, t, ob);
+                else if (t - ctx.Pending.Bar >= _bosWaitBars) ExpirePending(ctx, t, "no BOS");
+            }
             // confirmation candle
-            if (ctx.Waiting && ctx.Confirmations < S.MaxConfirmations && t > ctx.LastConfBar)
+            else if (ctx.Waiting && ctx.Confirmations < S.MaxConfirmations && t > ctx.LastConfBar)
             {
                 if (t - ctx.WaitStart > S.P_Bars)
                 {
@@ -437,11 +518,177 @@ namespace ReversalConfirmation.Core
                 }
             }
 
+            // the dotted pivot line lives as long as its break can still make a signal valid
+            if (ctx.Line != null && ctx.Line.BreakBar < 0)
+            {
+                ctx.Line.Live = ctx.Pending != null || (ctx.Waiting && ctx.Confirmations < S.MaxConfirmations)
+                                || (S.FiboEntry && !S.FiboRequireConf && t - ctx.Cand.ExtremeBar <= S.BosMaxBars);
+                if (ctx.Line.Live) ctx.Line.EndBar = t;
+            }
+
             bool activeZone = false;
             foreach (var zone in ctx.Zones) activeZone |= zone.State == ZoneState.Active;
-            if (!ctx.Waiting && !activeZone && !(ctx.InTrade && t - ctx.RevBar < 60))
-                ctx.Done = true;
-            if (t - ctx.RevBar > 120) ctx.Done = true;
+            bool awaitingBos = S.FiboEntry && ctx.BosBar < 0 && t - ctx.Cand.ExtremeBar <= S.BosMaxBars;
+            bool awaitingFibo = S.FiboEntry && ctx.BosBar >= 0 && !ctx.FibF7Done && !ctx.FibExpired;
+            if (!ctx.Waiting && ctx.Pending == null && !activeZone && !awaitingBos && !awaitingFibo && !(ctx.InTrade && t - ctx.RevBar < 60))
+                Finish(ctx, t);
+            if (t - ctx.RevBar > 120) Finish(ctx, t);
+        }
+
+        private void Finish(Context ctx, int t)
+        {
+            if (ctx.Pending != null) ExpirePending(ctx, t, "context end");
+            if (ctx.Line != null) ctx.Line.Live = false;
+            ctx.Done = true;
+        }
+
+        /// <summary>The pivot was broken: ring at the end of the dotted line, with the Fibo levels for a limit order.</summary>
+        private void StructureBroken(Context ctx, int t)
+        {
+            if (ctx.Line == null) return;
+            bool bull = ctx.Dir > 0;
+            ctx.BosMark = new Mark
+            {
+                Bar = t, Dir = ctx.Dir, Type = MarkType.StructureBreak, Label = "BOS", Price = ctx.Dir * ctx.BosO,
+                Score = ctx.Score, ContextId = ctx.Id, ValidBar = t, Tooltip = StructureTooltip(ctx, t)
+            };
+            AddMark(ctx.BosMark);
+            double range = ctx.FibB - ctx.ExtremeO;
+            string fib = S.FiboEntry && range > 0
+                ? $", F5 {F(ctx.Dir * RoundTick(ctx.FibB - S.FibF5 * range), "0.##")}, F7 {F(ctx.Dir * RoundTick(ctx.FibB - S.FibF7 * range), "0.##")}" : "";
+            Events.Add(new EngineEvent
+            {
+                Type = EngineEventType.StructureBreak, Bar = t, Dir = ctx.Dir, Price = ctx.Dir * ctx.BosO, Score = ctx.Score,
+                Text = $"Break struktury {(bull ? "nad" : "pod")} {F(ctx.Dir * ctx.BosO, "0.##")} ({(bull ? "bullish" : "bearish")}){fib}"
+            });
+        }
+
+        private string StructureTooltip(Context ctx, int t)
+        {
+            bool bull = ctx.Dir > 0;
+            var sb = new StringBuilder();
+            sb.Append("BREAK STRUKTURY (").Append(bull ? "bullish" : "bearish").Append(")  ")
+              .Append(S.BosOnClose ? "close " : "cena ").Append(bull ? "nad " : "pod ").Append(F(ctx.Dir * ctx.BosO, "0.##"));
+            sb.Append('\n').Append(ctx.BosAnomaly ? (bull ? "Úroveň: high svíčky A (anomálie - nové LL a zároveň high nad předchozí svíčkou)" : "Úroveň: low svíčky A (anomálie - nové HH a zároveň low pod předchozí svíčkou)")
+                                                  : (bull ? "Úroveň: pivot high (první svíčka vlevo od A, jejíž high vyčnívá nad svíčku nalevo)" : "Úroveň: pivot low (první svíčka vlevo od A, jejíž low vyčnívá pod svíčku nalevo)"));
+            sb.Append('\n').Append(bull ? "A (low reversalu): " : "A (high reversalu): ").Append(F(ctx.Dir * ctx.ExtremeO, "0.##"))
+              .Append(", break o ").Append(t - ctx.Cand.ExtremeBar).Append(" sv. později");
+            double range = ctx.FibB - ctx.ExtremeO;
+            if (S.FiboEntry && range > 0)
+            {
+                double f5 = RoundTick(ctx.FibB - S.FibF5 * range), f7 = RoundTick(ctx.FibB - S.FibF7 * range);
+                sb.Append('\n');
+                sb.Append('\n').Append("Impuls A→B zatím: B ").Append(F(ctx.Dir * ctx.FibB, "0.##")).Append(" (").Append(F(range / Tick, "0")).Append(" t)");
+                sb.Append('\n').Append("F5 (61,8 %): ").Append(F(ctx.Dir * f5, "0.##")).Append("   F7 (78,9 %): ").Append(F(ctx.Dir * f7, "0.##"));
+                sb.Append('\n').Append(bull ? "SL pod A: " : "SL nad A: ").Append(F(ctx.Dir * ctx.StopO, "0.##"));
+                sb.Append('\n').Append("TP (OP = A→B od vstupu): od F5 ").Append(F(ctx.Dir * RoundTick(f5 + range), "0.##"))
+                  .Append(" · od F7 ").Append(F(ctx.Dir * RoundTick(f7 + range), "0.##"));
+                sb.Append('\n').Append(bull ? "Když cena ještě poroste, B a s ním F5/F7 se posunou výš." : "Když cena ještě klesne, B a s ním F5/F7 se posunou níž.");
+            }
+            sb.Append('\n').Append(ctx.ValidConfirmations > 0 || ctx.Pending != null
+                ? "● order flow potvrdil (" + (ctx.Pending?.Label ?? "C" + ctx.ValidConfirmations) + "), potvrzení je tímto breakem platné"
+                : "○ order flow zatím nepotvrdil (C1)");
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Trader's entry model: after the BOS wait for the return into F5–F7 of the impulse A→B
+        /// (A = reversal extreme, B = highest high since A). F5 touch = signal "F"; a later or same-bar touch of F7
+        /// is logged as the deeper entry. Stop below A, target OP = 100 % of A→B projected from the entry.
+        /// </summary>
+        private void UpdateFibo(Context ctx, int t, OBar ob)
+        {
+            if (ctx.FibF7Done || ctx.FibExpired) return;
+            double a = ctx.ExtremeO, b = ctx.FibB, range = b - a;
+            if (!ctx.FibF5Done && t - ctx.BosBar > S.FibMaxBars) { ctx.FibExpired = true; return; }
+            if (range > 0)
+            {
+                double f5 = RoundTick(b - S.FibF5 * range), f7 = RoundTick(b - S.FibF7 * range), through = S.FibFillThroughTicks * Tick;
+                if (!ctx.FibF5Done && ob.L <= f5 - through + 1e-9)
+                {
+                    ctx.FibF5Done = true;
+                    FiboTrade(ctx, t, ob, Math.Min(f5, ob.O), "F5", f5, f7);
+                }
+                if (ctx.FibF5Done && !ctx.FibF7Done && ob.L <= f7 - through + 1e-9)
+                {
+                    ctx.FibF7Done = true;
+                    FiboTrade(ctx, t, ob, Math.Min(f7, ob.O), "F7", f5, f7);
+                }
+                if (ctx.FibF5Done) return;   // B is frozen once the pullback reached the zone
+            }
+            if (ob.H > ctx.FibB) ctx.FibB = ob.H;
+        }
+
+        private double RoundTick(double p) => Math.Round(p / Tick) * Tick;
+
+        private void FiboTrade(Context ctx, int t, OBar ob, double entry, string level, double f5, double f7)
+        {
+            double range = ctx.FibB - ctx.ExtremeO;
+            double op = RoundTick(entry + range);
+            double r = entry - ctx.StopO;
+            if (r <= 0) return;
+            bool bull = ctx.Dir > 0;
+            bool show = !S.FiboRequireConf || ctx.ValidConfirmations > 0;
+            if (level == "F5" && show)
+            {
+                AddMark(new Mark
+                {
+                    Bar = t, Dir = ctx.Dir, Type = MarkType.FiboEntry, Label = "F",
+                    Price = bull ? _bars[t].Low : _bars[t].High, ContextId = ctx.Id, Score = ctx.Score,
+                    Tooltip = FiboTooltip(ctx, t, f5, f7, op)
+                });
+                Events.Add(new EngineEvent
+                {
+                    Type = EngineEventType.FiboEntry, Bar = t, Dir = ctx.Dir, Price = ctx.Dir * f5, Score = ctx.Score,
+                    Text = $"Návrat do F5/F7 po breaku struktury ({(bull ? "long" : "short")}), F5 {F(ctx.Dir * f5, "0.##")}, F7 {F(ctx.Dir * f7, "0.##")}"
+                });
+            }
+
+            var row = new LogRow();
+            FillCommon(row, "FIB", _nextId++, ctx.Id, ctx.Dir, t);
+            FillCandidate(row, ctx.Cand);
+            row.Set("rev_score", ctx.Score).Set("conf_n", ctx.Confirmations).Set("had_conf", ctx.ValidConfirmations > 0)
+               .Set("bos_level", ctx.Dir * ctx.BosO).Set("bos_anomaly", ctx.BosAnomaly).Set("bos_bars", ctx.BosBar - ctx.Cand.ExtremeBar)
+               .Set("bos_dist_atr", (ctx.BosO - ctx.ExtremeO) / ctx.Atr)
+               .Set("fib_level", level).Set("fib_a", ctx.Dir * ctx.ExtremeO).Set("fib_b", ctx.Dir * ctx.FibB)
+               .Set("fib_range_atr", range / ctx.Atr).Set("fib_bars", t - ctx.BosBar)
+               .Set("entry", ctx.Dir * entry).Set("stop", ctx.Dir * ctx.StopO).Set("r_ticks", r / Tick)
+               .Set("t1", ctx.Dir * op).Set("t_first", ctx.Dir * op).Set("rr_first", (op - entry) / r);
+            var st = _stats[t];
+            row.Set("with_trend", !double.IsNaN(st.VwapSlope) && ctx.Dir * st.VwapSlope > 0);
+            var tr = new Tracker
+            {
+                Row = row, Dir = ctx.Dir, Kind = "FIB", EntryBar = t, Entry = entry, Stop = ctx.StopO, R = r, Tick = Tick,
+                TolTarget = Math.Max(S.TargetTolTicks * Tick, S.TargetTolAtr * ctx.Atr),
+                Horizons = S.Horizons, VBars = S.VReversalBars, Primary = 0
+            };
+            tr.Targets[0] = op;
+            tr.Targets[1] = tr.Targets[2] = double.NaN;
+            tr.Targets[3] = entry + S.TargetR1 * r;
+            tr.Targets[4] = entry + S.TargetR2 * r;
+            tr.OnDone = d => _log?.Write(d.Row);
+            tr.OnEntryBar(ob, t);
+            _trackers.Add(tr);
+        }
+
+        private string FiboTooltip(Context ctx, int t, double f5, double f7, double op)
+        {
+            bool bull = ctx.Dir > 0;
+            var sb = new StringBuilder();
+            sb.Append("F  NÁVRAT DO FIBO F5/F7 po breaku struktury (").Append(bull ? "long" : "short").Append(')');
+            sb.Append('\n').Append("Impuls A→B: A ").Append(F(ctx.Dir * ctx.ExtremeO, "0.##")).Append(" → B ").Append(F(ctx.Dir * ctx.FibB, "0.##"))
+              .Append(" (").Append(F((ctx.FibB - ctx.ExtremeO) / Tick, "0")).Append(" t)");
+            sb.Append('\n').Append("BOS: ").Append(F(ctx.Dir * ctx.BosO, "0.##")).Append(ctx.BosAnomaly ? " (anomálie, svíčka A)" : " (pivot)")
+              .Append(", před ").Append(t - ctx.BosBar).Append(" sv.");
+            sb.Append('\n');
+            sb.Append('\n').Append("F5 (61,8 %): ").Append(F(ctx.Dir * f5, "0.##"));
+            sb.Append('\n').Append("F7 (78,9 %): ").Append(F(ctx.Dir * f7, "0.##"));
+            sb.Append('\n').Append(bull ? "SL pod A: " : "SL nad A: ").Append(F(ctx.Dir * ctx.StopO, "0.##"));
+            sb.Append('\n').Append("TP (OP, 100 % A→B od F5): ").Append(F(ctx.Dir * op, "0.##"))
+              .Append(" · od F7: ").Append(F(ctx.Dir * RoundTick(f7 + (ctx.FibB - ctx.ExtremeO)), "0.##"));
+            sb.Append('\n').Append(ctx.ValidConfirmations > 0 ? $"● platné order-flow potvrzení (C{ctx.ValidConfirmations})" : "○ bez platného order-flow potvrzení (C1)");
+            sb.Append('\n').Append("V backtestu 2024–2026 vycházel vstup v F7 lépe než v F5.");
+            return sb.ToString();
         }
 
         private sealed class ConfResult
@@ -497,23 +744,84 @@ namespace ReversalConfirmation.Core
             ctx.LastConfBar = t;
             ctx.Waiting = false;
             string label = "C" + ctx.Confirmations;
-            var st = _stats[t];
-            Marks.Add(new Mark
+            bool bull = ctx.Dir > 0;
+            var mark = new Mark
             {
                 Bar = t, Dir = ctx.Dir, Type = MarkType.Confirmation, Label = label,
-                Price = ctx.Dir > 0 ? _bars[t].Low : _bars[t].High, Score = conf.Score, ContextId = ctx.Id,
-                Tooltip = ConfirmationTooltip(ctx, label, conf, ob)
-            });
+                Price = bull ? _bars[t].Low : _bars[t].High, Score = conf.Score, ContextId = ctx.Id
+            };
+            AddMark(mark);
+
+            if (S.RequireBos && ctx.BosBar < 0)
+            {
+                // order flow is there, the structure is not broken yet: wait for the BOS
+                mark.Pending = true;
+                mark.Tooltip = ConfirmationTooltip(ctx, label, conf, ob, t, -1, null);
+                ctx.Pending = new PendingConf { Bar = t, Label = label, Conf = conf, Mark = mark };
+                Events.Add(new EngineEvent
+                {
+                    Type = EngineEventType.ConfirmationPending, Bar = t, Dir = ctx.Dir, Price = ctx.Dir * ctx.BosO, Score = conf.Score,
+                    Text = $"{label} {(bull ? "bullish" : "bearish")}: order flow potvrdil, čeká na break struktury {(bull ? "nad" : "pod")} {F(ctx.Dir * ctx.BosO, "0.##")} (max {S.BosWaitMinutes} min)"
+                });
+                return;
+            }
+
+            mark.ValidBar = t;
+            mark.Tooltip = ConfirmationTooltip(ctx, label, conf, ob, t, t, null);
+            EmitValid(ctx, t, ob, t, ob, conf, label);
+        }
+
+        private void ValidatePending(Context ctx, int t, OBar ob)
+        {
+            var p = ctx.Pending;
+            ctx.Pending = null;
+            var cob = _bars[p.Bar].Oriented(ctx.Dir);
+            p.Mark.Pending = false;
+            p.Mark.ValidBar = t;
+            p.Mark.Tooltip = ConfirmationTooltip(ctx, p.Label, p.Conf, cob, p.Bar, t, null);
+            EmitValid(ctx, t, ob, p.Bar, cob, p.Conf, p.Label);
+        }
+
+        private void ExpirePending(Context ctx, int t, string why)
+        {
+            var p = ctx.Pending;
+            if (p == null) return;
+            ctx.Pending = null;
+            p.Mark.Pending = false;
+            p.Mark.Expired = true;
+            p.Mark.ExpiredBar = t;
+            p.Mark.Tooltip = ConfirmationTooltip(ctx, p.Label, p.Conf, _bars[p.Bar].Oriented(ctx.Dir), p.Bar, -1, why);
+            Count("conf: expired (" + why + ")");
+            if (why == "no BOS" && !ctx.Done && ctx.Confirmations < S.MaxConfirmations)
+            {
+                // the next order-flow confirmation may still come (max 2 per context)
+                ctx.Waiting = true;
+                ctx.WaitStart = t;
+            }
+        }
+
+        /// <summary>
+        /// A confirmation became valid on bar <paramref name="t"/> (order flow on bar <paramref name="confBar"/> and the
+        /// structure broken). Entry for the statistics = close of bar t, the first moment a trader can act on it.
+        /// </summary>
+        private void EmitValid(Context ctx, int t, OBar ob, int confBar, OBar cob, ConfResult conf, string label)
+        {
+            ctx.ValidConfirmations++;
+            if (ctx.BosMark != null && ctx.BosMark.Bar == t) ctx.BosMark.Tooltip = StructureTooltip(ctx, t);
+            bool bull = ctx.Dir > 0;
             Events.Add(new EngineEvent
             {
-                Type = EngineEventType.Confirmation, Bar = t, Dir = ctx.Dir, Price = ctx.Dir * ob.Poc, Score = conf.Score,
-                Text = $"{label} potvrzení {(ctx.Dir > 0 ? "bullish" : "bearish")} reversalu, skóre {F(conf.Score, "0")}, VPOC {F(ctx.Dir * ob.Poc, "0.##")}"
+                Type = EngineEventType.Confirmation, Bar = t, Dir = ctx.Dir, Price = ctx.Dir * cob.Poc, Score = conf.Score,
+                Text = confBar == t
+                    ? $"{label} potvrzení {(bull ? "bullish" : "bearish")} reversalu, skóre {F(conf.Score, "0")}, VPOC {F(ctx.Dir * cob.Poc, "0.##")}"
+                    : $"{label} platné: break struktury {(bull ? "nad" : "pod")} {F(ctx.Dir * ctx.BosO, "0.##")} ({(bull ? "bullish" : "bearish")}, skóre {F(conf.Score, "0")})"
             });
 
             var row = new LogRow();
             FillCommon(row, "CONF", _nextId++, ctx.Id, ctx.Dir, t);
             FillCandidate(row, ctx.Cand);
             FillConf(row, ctx, conf);
+            row.Set("conf_bar", confBar).Set("conf_wait_bars", t - confBar);
             var tr = MakeTracker(row, ctx.Dir, t, ob.C, ctx.StopO, ctx.OriginO, ctx.Atr, "CONF");
             if (tr != null)
             {
@@ -521,8 +829,8 @@ namespace ReversalConfirmation.Core
                 _trackers.Add(tr);
             }
 
-            if ((S.Zones & ZoneTypes.ConfirmationVpoc) != 0) CreateZone(ctx, t, ZoneTypes.ConfirmationVpoc, ob.Poc, 0.5 * (ctx.Score + conf.Score), conf.Score, conf);
-            if ((S.Zones & ZoneTypes.ConfirmationVal) != 0) CreateZone(ctx, t, ZoneTypes.ConfirmationVal, ob.ValueArea().val, 0.5 * (ctx.Score + conf.Score), conf.Score, conf);
+            if ((S.Zones & ZoneTypes.ConfirmationVpoc) != 0) CreateZone(ctx, t, ZoneTypes.ConfirmationVpoc, cob.Poc, 0.5 * (ctx.Score + conf.Score), conf.Score, conf);
+            if ((S.Zones & ZoneTypes.ConfirmationVal) != 0) CreateZone(ctx, t, ZoneTypes.ConfirmationVal, cob.ValueArea().val, 0.5 * (ctx.Score + conf.Score), conf.Score, conf);
             if ((S.Zones & ZoneTypes.ReversalVpoc) != 0) CreateZone(ctx, t, ZoneTypes.ReversalVpoc, ctx.RevPocO, 0.5 * (ctx.Score + conf.Score), conf.Score, conf);
         }
 
@@ -644,7 +952,7 @@ namespace ReversalConfirmation.Core
             zone.State = state;
             zone.EndBar = t;
             LogZoneUnfilled(ctx, zone, why);
-            if (!ctx.InTrade && ctx.Confirmations < S.MaxConfirmations && !ctx.Waiting)
+            if (!ctx.InTrade && ctx.Confirmations < S.MaxConfirmations && !ctx.Waiting && ctx.Pending == null)
             {
                 // diagram: zone expired -> wait for another confirmation (max 2 per context)
                 ctx.Waiting = true;
@@ -664,6 +972,8 @@ namespace ReversalConfirmation.Core
         private void Close(Context ctx, int t, string why, bool mark)
         {
             if (ctx.Done) return;
+            if (ctx.Pending != null) ExpirePending(ctx, t, why);
+            if (ctx.Line != null) ctx.Line.Live = false;
             ctx.Done = true;
             foreach (var z in ctx.Zones)
                 if (z.State == ZoneState.Active)
@@ -674,7 +984,7 @@ namespace ReversalConfirmation.Core
                 }
             if (!mark) return;
             string text = "Kontext zrušen: " + ReasonText(why);
-            Marks.Add(new Mark
+            AddMark(new Mark
             {
                 Bar = t, Dir = ctx.Dir, Type = MarkType.ContextCancelled, Label = "×",
                 Price = ctx.Dir > 0 ? _bars[t].Low : _bars[t].High, ContextId = ctx.Id, Tooltip = text
@@ -692,6 +1002,8 @@ namespace ReversalConfirmation.Core
                 case "opposite reversal": return "opačný reversal";
                 case "superseded": return "nahrazen silnějším reversalem";
                 case "roll": return "roll kontraktu";
+                case "window end": return "konec obchodního okna";
+                case "context end": return "setup vypršel";
                 default: return why;
             }
         }
@@ -776,7 +1088,7 @@ namespace ReversalConfirmation.Core
             row.Set("id", id).Set("kind", kind).Set("context_id", ctxId).Set("dir", dir).Set("bar", t)
                .Set("time_utc", b.TimeUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))
                .Set("time_et", st.T.Local.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))
-               .Set("session", st.T.SessionId).Set("min_from_rth", st.T.MinutesFromRth).Set("rth", st.T.IsRth).Set("news", st.T.News)
+               .Set("session", st.T.SessionId).Set("min_from_rth", st.T.MinutesFromRth).Set("rth", st.T.IsRth).Set("window", st.T.WindowCode).Set("news", st.T.News)
                .Set("atr", st.Atr).Set("atr_classic", st.AtrClassic).Set("tod_baseline", st.TodBaseline)
                .Set("volume", b.Volume).Set("volume_pct", st.VolumePct).Set("delta", b.Delta).Set("delta_z", st.DeltaZ);
             if (!double.IsNaN(st.Vwap) && st.Atr > 0)
@@ -807,7 +1119,10 @@ namespace ReversalConfirmation.Core
         {
             row.Set("rev_score", ctx.Score).Set("conf_score", conf.Score).Set("conf_n", ctx.Confirmations)
                .Set("conf_delta_z", conf.Z).Set("conf_clv", conf.Clv).Set("conf_eff_pct", conf.EffPct)
-               .Set("conf_imbalances", conf.Imbalances).Set("conf_vol_pct", conf.VolPct).Set("conf_warning", conf.Warning);
+               .Set("conf_imbalances", conf.Imbalances).Set("conf_vol_pct", conf.VolPct).Set("conf_warning", conf.Warning)
+               .Set("bos_level", ctx.Dir * ctx.BosO).Set("bos_anomaly", ctx.BosAnomaly)
+               .Set("bos_bars", ctx.BosBar >= 0 ? ctx.BosBar - ctx.Cand.ExtremeBar : -1)
+               .Set("bos_dist_atr", (ctx.BosO - ctx.ExtremeO) / ctx.Atr);
         }
 
         private static string ZoneTypeCode(ZoneTypes t)
@@ -872,13 +1187,20 @@ namespace ReversalConfirmation.Core
             return sb.ToString();
         }
 
-        private string ConfirmationTooltip(Context ctx, string label, ConfResult conf, OBar ob)
+        /// <param name="ob">The order-flow candle.</param>
+        /// <param name="t">Bar of the order-flow candle.</param>
+        /// <param name="validBar">Bar on which the confirmation became valid, -1 = pending or expired.</param>
+        /// <param name="expiredWhy">Reason when expired, null otherwise.</param>
+        private string ConfirmationTooltip(Context ctx, string label, ConfResult conf, OBar ob, int t, int validBar, string expiredWhy)
         {
             bool bull = ctx.Dir > 0;
+            string state = validBar >= 0 ? "PLATNÉ" : expiredWhy != null ? "NEPLATNÉ" : "ČEKÁ NA BREAK STRUKTURY";
             var sb = new StringBuilder();
-            sb.Append(label).Append("  POTVRZENÍ ").Append(bull ? "bullish" : "bearish").Append(" reversalu   skóre ").Append(F(conf.Score, "0"));
+            sb.Append(label).Append("  POTVRZENÍ ").Append(bull ? "bullish" : "bearish").Append(" reversalu – ").Append(state)
+              .Append("   skóre ").Append(F(conf.Score, "0"));
             sb.Append('\n').Append(bull ? "Kupci převzali iniciativu a low reversalu drží." : "Prodejci převzali iniciativu a high reversalu drží.");
             sb.Append('\n');
+            if (S.RequireBos) AppendBosState(sb, ctx, t, validBar, expiredWhy);
             sb.Append('\n').Append("● delta z ").Append(F(ctx.Dir * conf.Z, "+0.0;-0.0")).Append(bull ? " (agresivní nákupy)" : " (agresivní prodeje)");
             sb.Append('\n').Append("● close ").Append(F(conf.Clv * 100, "0")).Append(bull ? " % cesty od lowu k highu, nad close předchozí svíčky" : " % cesty od highu k lowu, pod close předchozí svíčky");
             sb.Append('\n').Append("● efektivita ").Append(F(conf.EffPct, "0")).Append(". percentil (cena se opravdu pohnula)");
@@ -887,8 +1209,47 @@ namespace ReversalConfirmation.Core
             sb.Append('\n').Append(conf.AboveRevHigh ? "● " : "○ ").Append(bull ? "close nad high reversalu" : "close pod low reversalu");
             if (conf.Warning) sb.Append('\n').Append(bull ? "! POC nahoře a prodej nad POC (prodej do růstu)" : "! POC dole a nákup pod POC (nákup do poklesu)");
             sb.Append('\n').Append('\n').Append("VPOC svíčky (úroveň pro limit): ").Append(F(ctx.Dir * ob.Poc, "0.##"));
+            if (validBar >= 0 && S.FiboEntry && !double.IsNaN(ctx.FibB) && ctx.FibB > ctx.ExtremeO)
+            {
+                double range = ctx.FibB - ctx.ExtremeO;
+                double f5 = RoundTick(ctx.FibB - S.FibF5 * range), f7 = RoundTick(ctx.FibB - S.FibF7 * range);
+                sb.Append('\n').Append("Fibo A→B (B = ").Append(bull ? "high" : "low").Append(" k této svíčce): F5 ").Append(F(ctx.Dir * f5, "0.##"))
+                  .Append(" · F7 ").Append(F(ctx.Dir * f7, "0.##"));
+                sb.Append('\n').Append(bull ? "SL pod A: " : "SL nad A: ").Append(F(ctx.Dir * ctx.StopO, "0.##"))
+                  .Append(" · TP (OP od F5): ").Append(F(ctx.Dir * RoundTick(f5 + range), "0.##"));
+            }
             return sb.ToString();
         }
+
+        private void AppendBosState(StringBuilder sb, Context ctx, int t, int validBar, string expiredWhy)
+        {
+            bool bull = ctx.Dir > 0;
+            string level = F(ctx.Dir * ctx.BosO, "0.##");
+            string pivot = ctx.BosAnomaly ? (bull ? "high svíčky A - anomálie" : "low svíčky A - anomálie")
+                                          : (bull ? "pivot high, poslední LH" : "pivot low, poslední HL");
+            string side = (S.BosOnClose ? "close " : "cena ") + (bull ? "nad " : "pod ");
+            if (validBar >= 0 && validBar > t)
+            {
+                int n = validBar - t;
+                sb.Append('\n').Append("● break struktury: ").Append(side).Append(level).Append(" (").Append(pivot).Append(')');
+                sb.Append('\n').Append("   přišel o ").Append(n).Append(" sv. později").Append(MinutesText(n))
+                  .Append(" – teprve tehdy je potvrzení platné");
+            }
+            else if (validBar >= 0)
+                sb.Append('\n').Append("● break struktury: ").Append(side).Append(level).Append(" (").Append(pivot).Append(')')
+                  .Append(ctx.BosBar == t ? ", touto svíčkou" : $", před {t - ctx.BosBar} sv.");
+            else if (expiredWhy == "no BOS")
+                sb.Append('\n').Append("○ break struktury ").Append(bull ? "nad " : "pod ").Append(level).Append(" nepřišel do ")
+                  .Append(S.BosWaitMinutes).Append(" min (").Append(pivot).Append(')');
+            else if (expiredWhy != null)
+                sb.Append('\n').Append("○ break struktury nepřišel: ").Append(ReasonText(expiredWhy));
+            else
+                sb.Append('\n').Append("○ čeká se na break struktury: ").Append(side).Append(level).Append(" (").Append(pivot).Append(')')
+                  .Append('\n').Append("   max ").Append(S.BosWaitMinutes).Append(" min (").Append(_bosWaitBars).Append(" sv.), čára tečkovaně");
+        }
+
+        private string MinutesText(int bars) =>
+            Clock.BarMinutes > 0 ? " (" + F(bars * Clock.BarMinutes, "0") + " min)" : "";
 
         private string RetestTooltip(Context ctx, OBar ob)
         {

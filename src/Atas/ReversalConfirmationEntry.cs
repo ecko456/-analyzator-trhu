@@ -21,6 +21,13 @@ namespace ReversalConfirmation.Atas
         [Display(Name = "RTH (09:30–16:00 ET)")] Rth
     }
 
+    public enum TradeChoice
+    {
+        [Display(Name = "RTH – americká seance")] Rth,
+        [Display(Name = "ETH – evropské dopoledne")] Eth,
+        [Display(Name = "Celý den")] All
+    }
+
     public enum AtrChoice
     {
         [Display(Name = "Klasický ATR14")] Classic,
@@ -77,6 +84,24 @@ namespace ReversalConfirmation.Atas
 
         #region Parameters: session
 
+        [Display(Name = "Obchoduji", GroupName = GSession, Order = 1, Description = "Okno, ve kterém indikátor hledá signály. Každé okno má vlastní kalibraci (calibration_rth.json / calibration_eth.json), protože RTH a evropské dopoledne mají jinou volatilitu a objemy. Svíčky mimo okno jen počítají úrovně a statistiky.")]
+        public TradeChoice TradingWindow { get => (TradeChoice)_s.Window; set { _s.Window = (TradeWindow)value; RecalculateValues(); } }
+
+        [Display(Name = "RTH od (můj čas)", GroupName = GSession, Order = 2, Description = "Řídí se burzou v New Yorku: v týdnech, kdy USA a Evropa mění čas v jiný den, začne o hodinu dřív (14:30).")]
+        public TimeSpan RthWindowFrom { get => _s.RthWindowFrom; set { _s.RthWindowFrom = value; RecalculateValues(); } }
+
+        [Display(Name = "RTH do (můj čas)", GroupName = GSession, Order = 3)]
+        public TimeSpan RthWindowTo { get => _s.RthWindowTo; set { _s.RthWindowTo = value; RecalculateValues(); } }
+
+        [Display(Name = "ETH od (můj čas)", GroupName = GSession, Order = 4)]
+        public TimeSpan EthWindowFrom { get => _s.EthWindowFrom; set { _s.EthWindowFrom = value; RecalculateValues(); } }
+
+        [Display(Name = "ETH do (můj čas)", GroupName = GSession, Order = 5)]
+        public TimeSpan EthWindowTo { get => _s.EthWindowTo; set { _s.EthWindowTo = value; RecalculateValues(); } }
+
+        [Display(Name = "Moje časové pásmo", GroupName = GSession, Order = 6, Description = "Pro časy oken výše. IANA nebo Windows ID, např. Europe/Prague nebo Central Europe Standard Time.")]
+        public string LocalTimeZone { get => _s.LocalTimeZoneId; set { _s.LocalTimeZoneId = value; RecalculateValues(); } }
+
         [Display(Name = "Časové pásmo session", GroupName = GSession, Order = 10, Description = "IANA nebo Windows ID. CME akciové futures: America/New_York (řeší i rozdílný přechod na letní čas USA/EU).")]
         public string TimeZone { get => _s.TimeZoneId; set { _s.TimeZoneId = value; RecalculateValues(); } }
 
@@ -94,9 +119,6 @@ namespace ReversalConfirmation.Atas
 
         [Display(Name = "Profil předchozího dne", GroupName = GSession, Order = 60, Description = "Z čeho se počítá high/low/POC/VAH/VAL předchozího dne.")]
         public SessionChoice PriorDayProfile { get => (SessionChoice)_s.PriorDayProfile; set { _s.PriorDayProfile = (SessionMode)value; RecalculateValues(); } }
-
-        [Display(Name = "Signály v session", GroupName = GSession, Order = 70, Description = "ETH = celý den (výchozí, dle zadání), RTH = jen 09:30–16:00 ET.")]
-        public SessionChoice SignalSession { get => (SessionChoice)_s.SignalSession; set { _s.SignalSession = (SessionMode)value; RecalculateValues(); } }
 
         [Display(Name = "Časy zpráv (ET, oddělit ;)", GroupName = GSession, Order = 80)]
         public string NewsTimes { get => _s.NewsTimes; set { _s.NewsTimes = value; RecalculateValues(); } }
@@ -256,6 +278,19 @@ namespace ReversalConfirmation.Atas
         [Range(0, 1)]
         public decimal ConfClv { get => (decimal)_s.Conf_Clv; set { _s.Conf_Clv = (double)value; RecalculateValues(); } }
 
+        [Display(Name = "Platné až po breaku struktury (BOS)", GroupName = GConfirm, Order = 1, Description = "Bullish: close nad pivot high (první svíčka vlevo od low A, jejíž high vyčnívá nad svíčku nalevo), u anomálie (svíčka A s novým low a zároveň high nad předchozí svíčkou) nad high svíčky A. Bearish zrcadlově.")]
+        public bool RequireBos { get => _s.RequireBos; set { _s.RequireBos = value; RecalculateValues(); } }
+
+        [Display(Name = "Čekat na BOS po potvrzení (min)", GroupName = GConfirm, Order = 2, Description = "Potvrzení bez breaku je prázdný čtvereček; když break přijde do této doby, čtvereček se vyplní (platné), jinak zešedne.")]
+        [Range(0, 240)]
+        public int BosWaitMinutes { get => _s.BosWaitMinutes; set { _s.BosWaitMinutes = value; RecalculateValues(); } }
+
+        [Display(Name = "BOS jen na close (ne knotem)", GroupName = GConfirm, Order = 3)]
+        public bool BosOnClose { get => _s.BosOnClose; set { _s.BosOnClose = value; RecalculateValues(); } }
+
+        [Display(Name = "F (návrat do F5/F7) jen po platném C1/C2", GroupName = GConfirm, Order = 4, Description = "Vypnuto: F po každém breaku struktury reversalu. V backtestu 2024–2026 nebyl vstup v F7 s order-flow potvrzením lepší než bez něj.")]
+        public bool FiboRequireConf { get => _s.FiboRequireConf; set { _s.FiboRequireConf = value; RecalculateValues(); } }
+
         [Display(Name = "Min. percentil efektivity", GroupName = GConfirm, Order = 50)]
         [Range(0, 100)]
         public int ConfEfficiency { get => (int)_s.Conf_EfficiencyPct; set { _s.Conf_EfficiencyPct = value; RecalculateValues(); } }
@@ -352,7 +387,7 @@ namespace ReversalConfirmation.Atas
         [Display(Name = "Použít kalibrované váhy A–I", GroupName = GLog, Order = 40, Description = "Vypnuto: skóre podle vah ze zadání, z kalibrace se berou jen změřené pravděpodobnosti.")]
         public bool UseCalibratedWeights { get => _s.UseCalibratedWeights; set { _s.UseCalibratedWeights = value; RecalculateValues(); } }
 
-        [Display(Name = "Kalibrační JSON", GroupName = GLog, Order = 30, Description = "Výstup calibration/calibrate.py. Prázdné = %APPDATA%\\ATAS\\ReversalConfirmation\\calibration.json (pokud existuje).")]
+        [Display(Name = "Kalibrační JSON", GroupName = GLog, Order = 30, Description = "Výstup calibration/calibrate.py. Prázdné = podle okna %APPDATA%\\ATAS\\ReversalConfirmation\\calibration_rth.json, calibration_eth.json, u celého dne calibration.json.")]
         public string CalibrationFile { get => _calibrationFile; set { _calibrationFile = value; RecalculateValues(); } }
         private string _calibrationFile = "";
 
@@ -372,6 +407,15 @@ namespace ReversalConfirmation.Atas
 
         [Display(Name = "Čtvereček R (retest)", GroupName = GView, Order = 40)]
         public bool ShowRetests { get; set; } = true;
+
+        [Display(Name = "Tečkovaně pivot pro break (BOS)", GroupName = GView, Order = 41, Description = "Úroveň, kterou musí cena prorazit, aby bylo potvrzení platné. Kroužek = break.")]
+        public bool ShowStructure { get; set; } = true;
+
+        [Display(Name = "Čtvereček F (návrat do F5/F7)", GroupName = GView, Order = 42)]
+        public bool ShowFibo { get; set; } = true;
+
+        [Display(Name = "Neplatná potvrzení (šedě)", GroupName = GView, Order = 43)]
+        public bool ShowExpired { get; set; } = true;
 
         [Display(Name = "Tooltip po najetí myší", GroupName = GView, Order = 50)]
         public bool ShowTooltip { get; set; } = true;
@@ -418,6 +462,15 @@ namespace ReversalConfirmation.Atas
 
         [Display(Name = "Alert: retest R", GroupName = GAlerts, Order = 20)]
         public bool AlertRetest { get; set; } = true;
+
+        [Display(Name = "Alert: potvrzení čeká na break", GroupName = GAlerts, Order = 21)]
+        public bool AlertPending { get; set; } = true;
+
+        [Display(Name = "Alert: návrat do F5/F7 (F)", GroupName = GAlerts, Order = 22)]
+        public bool AlertFibo { get; set; } = true;
+
+        [Display(Name = "Alert: break struktury", GroupName = GAlerts, Order = 23)]
+        public bool AlertBos { get; set; }
 
         [Display(Name = "Alert: reversal (tečka)", GroupName = GAlerts, Order = 30)]
         public bool AlertReversal { get; set; }
@@ -479,7 +532,9 @@ namespace ReversalConfirmation.Atas
             var baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ATAS", "ReversalConfirmation");
 
             Calibration cal = null;
-            var calPath = string.IsNullOrWhiteSpace(_calibrationFile) ? Path.Combine(baseDir, "calibration.json") : _calibrationFile;
+            // each trading window has its own calibration: RTH and the European morning do not mix
+            string calName = _s.Window == TradeWindow.Rth ? "calibration_rth.json" : _s.Window == TradeWindow.Eth ? "calibration_eth.json" : "calibration.json";
+            var calPath = string.IsNullOrWhiteSpace(_calibrationFile) ? Path.Combine(baseDir, calName) : _calibrationFile;
             string calError = null;
             try { cal = Calibration.TryLoad(calPath, out calError); } catch (Exception e) { calError = e.Message; }
 
@@ -495,7 +550,10 @@ namespace ReversalConfirmation.Atas
             }
 
             _engine = new ReversalEngine(_s, tick, minutes, _log, cal);
-            _status = (cal != null ? "kalibrace: " + Path.GetFileName(calPath) : calError != null ? "kalibrace: chyba " + calError : "bez kalibrace")
+            string want = _s.Window == TradeWindow.Rth ? "rth" : _s.Window == TradeWindow.Eth ? "eth" : "";
+            string mismatch = cal != null && !string.Equals(cal.Window, want, StringComparison.OrdinalIgnoreCase)
+                ? $" (POZOR: změřeno pro okno '{(cal.Window == "" ? "celý den" : cal.Window)}')" : "";
+            _status = (cal != null ? "kalibrace: " + Path.GetFileName(calPath) + mismatch : calError != null ? "kalibrace: chyba " + calError : "bez kalibrace")
                       + (minutes > 0 ? "" : " | graf není časový: time-of-day srovnání vypnuto");
         }
 
@@ -580,7 +638,10 @@ namespace ReversalConfirmation.Atas
             bool on = e.Type switch
             {
                 EngineEventType.Confirmation => AlertConfirmation,
+                EngineEventType.ConfirmationPending => AlertPending,
                 EngineEventType.Retest => AlertRetest,
+                EngineEventType.FiboEntry => AlertFibo,
+                EngineEventType.StructureBreak => AlertBos,
                 EngineEventType.Reversal => AlertReversal && (!AlertReversalStrongOnly || e.Score >= _s.StrongScore),
                 EngineEventType.NewZone => AlertNewZone,
                 EngineEventType.ZoneFilled => AlertFill,
@@ -630,6 +691,7 @@ namespace ReversalConfirmation.Atas
                 lock (engine.Sync)
                 {
                     if (ShowZones) DrawZones(context, engine, first, last);
+                    if (ShowStructure) DrawStructures(context, engine, first, last);
                     DrawMarks(context, engine, first, last);
                     if (ShowLevels) DrawLevels(context, engine, last);
                     if (ShowStats) DrawStats(context, engine);
@@ -724,8 +786,10 @@ namespace ReversalConfirmation.Atas
             switch (m.Type)
             {
                 case MarkType.Reversal: return m.Score >= DotMinScore;
-                case MarkType.Confirmation: return ShowConfirmations;
+                case MarkType.Confirmation: return ShowConfirmations && (!m.Expired || ShowExpired);
                 case MarkType.Retest: return ShowRetests;
+                case MarkType.FiboEntry: return ShowFibo;
+                case MarkType.StructureBreak: return ShowStructure && m.Score >= DotMinScore;
                 case MarkType.AbsorptionFailed: return ShowWarnings;
                 case MarkType.ContextCancelled: return ShowCancelled;
                 default: return false;
@@ -737,6 +801,8 @@ namespace ReversalConfirmation.Atas
         {
             int x = X(m.Bar) + BarWidth / 2;
             int y = Y(m.Price);
+            // ring on the broken level, just right of the breaking candle (on its body it would vanish)
+            if (m.Type == MarkType.StructureBreak) return new Point(X(m.Bar) + BarWidth + 6, y);
             int step = m.Type == MarkType.Reversal ? 8 : m.Type == MarkType.Confirmation || m.Type == MarkType.Retest ? 20 : 32;
             int off = RowHalf + step;
             return new Point(x, m.Dir > 0 ? y + off : y - off);
@@ -765,10 +831,19 @@ namespace ReversalConfirmation.Atas
                             g.DrawString(m.Score.ToString("0", CultureInfo.InvariantCulture), _font, TextColor, c.X + r + 3, c.Y - 6);
                         break;
                     case MarkType.Confirmation:
-                        Label(g, m.Label, col, c.X, c.Y, true);
+                        // filled = valid (structure broken), hollow = waiting for the break, grey = the break never came
+                        if (m.Expired) Hollow(g, m.Label, Color.FromArgb(150, 128, 128, 128), c.X, c.Y);
+                        else if (m.Pending) Hollow(g, m.Label, col, c.X, c.Y);
+                        else Label(g, m.Label, col, c.X, c.Y, true);
                         break;
                     case MarkType.Retest:
                         Label(g, "R", col, c.X, c.Y, true);
+                        break;
+                    case MarkType.FiboEntry:
+                        Label(g, "F", col, c.X, c.Y, true);
+                        break;
+                    case MarkType.StructureBreak:
+                        g.DrawEllipse(new RenderPen(col, 2), new Rectangle(c.X - 4, c.Y - 4, 8, 8));
                         break;
                     case MarkType.AbsorptionFailed:
                         Label(g, "!", Color.Orange, c.X, c.Y, true);
@@ -777,6 +852,45 @@ namespace ReversalConfirmation.Atas
                         Label(g, "×", Color.Gray, c.X, c.Y, false);
                         break;
                 }
+            }
+        }
+
+        private void Hollow(RenderContext g, string text, Color col, int x, int y)
+        {
+            var size = g.MeasureString(text, _fontBold);
+            var rect = new Rectangle(x - size.Width / 2 - 2, y - size.Height / 2 - 1, size.Width + 4, size.Height + 2);
+            g.DrawRectangle(new RenderPen(col, 1), rect);
+            g.DrawString(text, _fontBold, col, rect, _center);
+        }
+
+        /// <summary>
+        /// Dotted line at the pivot that has to break (BOS), from the pivot candle to the break (ring) or to the last
+        /// bar on which the setup was still alive. Dots are small filled squares: cheap and identical in every ATAS version.
+        /// </summary>
+        private void DrawStructures(RenderContext g, ReversalEngine e, int first, int last)
+        {
+            var list = e.Structures;
+            // a line ends at most ~130 bars after its reversal: binary search on the reversal bar
+            int lo = 0, hi = list.Count;
+            while (lo < hi)
+            {
+                int m = (lo + hi) >> 1;
+                if (list[m].ReversalBar < first - 130) lo = m + 1; else hi = m;
+            }
+            for (int i = lo; i < list.Count; i++)
+            {
+                var l = list[i];
+                if (l.PivotBar > last) break;
+                if (l.EndBar < first || l.Score < DotMinScore) continue;
+                var col = l.Dir > 0 ? BullColor : BearColor;
+                bool broken = l.BreakBar >= 0;
+                var dot = broken || l.Live ? Alpha(col, 230) : Color.FromArgb(110, 128, 128, 128);
+                int x1 = X(l.PivotBar) + BarWidth / 2;
+                int x2 = l.Live || broken ? X(l.EndBar) + BarWidth + 2 : X(l.EndBar) + BarWidth / 2;
+                int y = Y(l.Price);
+                // dots stay on a fixed grid from the pivot, so they do not shimmer while scrolling
+                int from = x1 < -10 ? x1 + (-10 - x1 + 4) / 5 * 5 : x1, to = Math.Min(x2, ChartInfo.Region.Width + 10);
+                for (int x = from; x <= to; x += 5) g.FillRectangle(dot, new Rectangle(x, y, 2, 2));
             }
         }
 

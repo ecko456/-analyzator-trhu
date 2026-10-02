@@ -21,7 +21,52 @@ Data v repozitáři nejsou (licence tržních dat). Jak je stáhnout a přehrát
 * **R (výstup 1,5R)**: pevný target 1,5 R. Nezávisí na geometrii T1, proto je to hlavní měřítko kvality vstupu.
 * **±** = směrodatná chyba průměru. Poplatky nejsou započtené. ES má round-trip ~1,4 ticku včetně skluzu na stopu, tedy ~0,05–0,1 R podle velikosti R.
 
-## Výsledky
+## Break struktury, F5/F7 a obchodní okna (aktuální verze)
+
+Od této verze platí potvrzení C1/C2 až po **breaku struktury** (BOS) a signály se hledají jen v **obchodním okně**: RTH = 15:30–22:12 pražského času (09:30–16:12 New York, okno se drží New Yorku i v týdnech přechodu času), ETH = evropské dopoledne 08:00–15:00 Praha. Každé okno má vlastní kalibraci.
+
+* **BOS** (podle schémat obchodníka): bullish = close nad prvním pivot high vlevo od low A (svíčka, jejíž high vyčnívá nad svíčku nalevo). **Anomálie**: když svíčka A udělá nové low a zároveň high nad předchozí svíčkou (outside bar), láme se high svíčky A. Bearish zrcadlově. Anomálie tvoří ~53 % případů, BOS je v mediánu 1,8 ATR od extrému a 2 svíčky po něm.
+* **Platné C**: order-flow svíčka (podmínky beze změny) + BOS buď už proběhl, nebo přijde do 30 minut (6 svíček M5) po ní. Statistika vstupuje na **close svíčky, kterou se potvrzení stalo platným**, ne na close order-flow svíčky.
+* **F5/F7**: po BOS (do 24 svíček od A) limit v 61,8 % / 78,9 % impulsu A→B (B = nejvyšší high od A, zmrazí se dotykem F5), stop pod A (stejný buffer), výstup na 1,5 R. Ceny zaokrouhlené na tick. Fill = dotyk (konzervativně: proobchodování o 1 tick).
+* Výsledky jsou **po odečtení nákladů 1,4 ticku na obchod** (komise + 1 tick skluzu), v R na obchod ± směrodatná chyba.
+
+| vstup (výstup 1,5 R, net) | RTH trénink | RTH test | ETH trénink | ETH test |
+|---|---:|---:|---:|---:|
+| trhem na close order-flow svíčky (bez BOS) | −0,08 (476) | −0,05 (255) | −0,14 (318) | −0,09 (181) |
+| trhem na close, BOS před/na svíčce | −0,06 (199) | −0,05 (109) | +0,01 (156) | −0,05 (82) |
+| **trhem po platném C (BOS do 30 min)** | −0,10 (225) | −0,07 (120) | −0,02 (174) | −0,07 (92) |
+| limit F5 po BOS, bez platného C | +0,15 (77) | −0,22 (33) | +0,21 (104) | +0,34 (44) |
+| limit F5 po BOS, s platným C | +0,05 (91) | −0,08 (47) | −0,12 (70) | +0,16 (43) |
+| **limit F7 po BOS, bez platného C** | **+0,25** ± 0,18 (50) | **+0,44** ± 0,26 (23) | **+0,34** ± 0,14 (73) | **+0,63** ± 0,24 (24) |
+| limit F7 po BOS, s platným C | +0,05 (69) | +0,22 (33) | +0,12 (53) | +0,35 (29) |
+| F7 s i bez C, fill jen proobchodováním | +0,08 (112) | +0,32 (54) | +0,17 (120) | +0,42 (50) |
+| **limit na VPOC retestu (R)** | **+0,21** ± 0,13 (93) | **+0,70** ± 0,16 (53) | **+0,29** ± 0,14 (75) | **+0,55** ± 0,18 (43) |
+| R, fill jen proobchodováním | +0,22 (89) | +0,56 (50) | +0,14 (67) | +0,54 (42) |
+
+V závorce počet obchodů (trénink 321 dní, test 183–184 dní). Četnost v jednom okně: tečka 4–6× za den, platné C 0,5–0,7×, R ~0,3×, F7 ~0,3×.
+
+**Co z toho plyne:**
+
+1. **Break struktury zpřísní potvrzení** zhruba na polovinu (1,4–1,5 → 0,6–0,7 za den v RTH) a cena po platném C dojde k originu pohybu (T1) v 61–78 % případů (bez BOS 58–63 %). Jako **vstup trhem** ale platné C výhodu nemá: stop pod A je po breaku daleko (medián rizika 65–80 ticků v RTH) a 1,5 R je pak dlouhá cesta.
+2. **Metoda „BOS + návrat do F7" je kladná ve všech čtyřech řezech** i po nákladech a s konzervativním fillem. F5 je v RTH nespolehlivé (test −0,22). Vzorky F7 jsou ale malé (23–73 obchodů na řez), takže rozdíly kolem ±0,2 R jsou v rámci šumu.
+3. **Order-flow potvrzení vstup F7 nezlepšilo** (s platným C +0,05/+0,22 RTH, bez platného C +0,25/+0,44). Proto čtvereček F ve výchozím stavu nečeká na C1 (`FiboRequireConf = false`).
+4. **Retest (R) zůstává nejstabilnější** v obou oknech a obou modelech fillu.
+5. **RTH a ETH se liší** (jiná velikost rizika: medián F7 18–21 vs 9–11 ticků, jiné koeficienty kalibračních modelů, např. váha komponenty I nebo úrovně). Oddělená kalibrace podle okna má proto smysl.
+
+Reprodukce (data viz výše):
+
+```bash
+dotnet run -c Release --project tools/Replay -- --data data/fp5 --out runs/rth --set Window=Rth
+dotnet run -c Release --project tools/Replay -- --data data/fp5 --out runs/eth --set Window=Eth
+dotnet run -c Release --project tools/Replay -- --data data/fp5 --out runs/rth_nobos --set Window=Rth --set RequireBos=false
+dotnet run -c Release --project tools/Replay -- --data data/fp5 --out runs/rth_ft --set Window=Rth --set FibFillThroughTicks=1 --set FillTolTicks=-1
+python calibration/calibrate.py runs/rth/log.csv --window rth --out calibration/es_m5_rth.json
+python calibration/calibrate.py runs/eth/log.csv --window eth --out calibration/es_m5_eth.json
+```
+
+## Výsledky první verze (celý den, bez BOS)
+
+Tabulky níže jsou z první verze: signály přes celý den, potvrzení bez breaku struktury, náklady nezapočtené.
 
 | varianta | období | session | reversaly / session | potvrzení / session | vyplněné zóny | T1 zasažen | R (výstup T1) | R (výstup 1,5R) | win 1,5R |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|

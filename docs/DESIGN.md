@@ -11,7 +11,7 @@ src/Core      engine bez závislosti na ATAS (sdílený s backtestem a testy)
   Session.cs      session kalendář v ET (DST správně), okna zpráv
   Levels.cs       referenční úrovně (VWAP, pásma, OR/IB, předchozí den, overnight, pooly, swingy, ruční)
   Detector.cs     vrstva 1: komponenty A–I, varianty 1-bar / 2-bar / 3-bar / stall, gate, skóre
-  Engine.cs       vrstva 2: kontexty, potvrzení C1/C2, retest, zóny, stop/targety, filtry šumu
+  Engine.cs       vrstva 2: kontexty, break struktury, potvrzení C1/C2 (čeká → platné / vypršelo), retest, F5/F7, zóny, stop/targety, obchodní okno
   Outcomes.cs     sledování výsledků (MFE/MAE, targety, R) a CSV schéma
   Calibration.cs  načtení calibration.json (váhy, logistický model, tabulka spolehlivosti)
   Logging.cs      neblokující CSV writer (vlákno na pozadí)
@@ -63,7 +63,13 @@ calibration/calibrate.py  kalibrace + walk-forward validace
 | Změna | Důvod |
 |---|---|
 | Časy zpráv ve výchozím nastavení **08:30**; 10:00; 14:00 ET | 08:30 (CPI, NFP, claims) jsou největší zprávy pro ES. Okno se jen označí, potlačení je volitelné. |
-| Parametr **„Signály v session"** (ETH/RTH), výchozí ETH podle zadání | V RTH obchoduješ. Backtest mezi RTH a nocí konzistentní rozdíl neukázal (obojí kladné). |
+| **Obchodní okno** „Obchoduji": RTH 15:30–22:12 nebo ETH 08:00–15:00 (čas obchodníka, `Europe/Prague`), výchozí RTH. Nahrazuje původní „Signály v session". | Přání obchodníka: RTH a evropské dopoledne mají jinou volatilitu i objemy a ostatní časy kalibraci jen rozhodí. Mimo okno se nehledají signály a otevřené kontexty se zavřou (`window end`); svíčky dál krmí úrovně a statistiky. RTH okno se převádí na čas burzy přes standardní rozdíl časových pásem (Praha − New York = 6 h), takže v týdnech přechodu času začíná ve 14:30. |
+| **Kalibrace zvlášť pro každé okno** (`calibration_rth.json`, `calibration_eth.json`, celý den `calibration.json`) | `calibrate.py --window rth/eth` bere jen řádky z okna. Indikátor podle přepínače načte správný soubor a v panelu upozorní, když soubor patří jinému oknu. |
+| **Potvrzení platí až po breaku struktury (BOS)** | Metoda obchodníka (schémata `reversal_*.svg` na `main`). Bullish: close nad prvním pivot high vlevo od low A (svíčka, jejíž high je nad svíčkou nalevo); anomálie: svíčka A s novým low a zároveň high nad předchozí svíčkou → láme se high svíčky A. Bearish zrcadlově. Úroveň se určí v okamžiku reversalu z uzavřených svíček a už se nemění. |
+| **Čekání na BOS 30 minut** po order-flow svíčce | Přání obchodníka. Do té doby prázdný čtvereček (pending), pak plný (platné, `ValidBar` = svíčka s breakem) nebo šedý (expired). Stav se mění jen dopředu, poloha a popisek značky nikdy. Alert, statistika i zóna vznikají až na svíčce s breakem. |
+| **Tečkovaná čára pivotu + kroužek na breaku** | Obchodník chce vidět předem, co se tvoří a na jaký break se čeká. Čára žije, dokud může vzniknout platný signál; kroužek nese v tooltipu F5/F7/SL/OP. |
+| **Čtvereček F: návrat do F5 po BOS** (SL pod A, TP = OP), výchozí bez nutnosti C1 | Vstup ze schémat obchodníka. Backtest: F7 kladné ve všech řezech, s order-flow potvrzením ne lépe ([BACKTEST](BACKTEST.md#break-struktury-f5f7-a-obchodní-okna-aktuální-verze)). |
+| Reversal stejného směru **nenahradí** kontext, který už má potvrzení z dřívější svíčky | Jinak by nový bod uprostřed čekání na break zrušil rozjetý C1 a přepsal čáru, na kterou se obchodník dívá. Nižší low kontext ruší dál. |
 | Parametr **„Jen zóny po směru VWAP trendu"**, výchozí vypnuto | Lepší v části řezů, ne konzistentně ([BACKTEST](BACKTEST.md)). |
 | Parametr **ATR: hybrid**, výchozí klasický ATR14 | ATR14 kolem RTH open podhodnocuje volatilitu 2,6× (změřeno). Hybrid ale v backtestu lepší nebyl. |
 | Kalibrace = **logistický model + tabulka spolehlivosti** místo pouhých bucketů skóre | Zobrazuje se naměřená úspěšnost bucketu modelu (min. 30 vzorků), ne odhad. Váhy A–I z kalibrace jen volitelně. |
@@ -73,7 +79,8 @@ calibration/calibrate.py  kalibrace + walk-forward validace
 
 ## Log (CSV) – hlavní sloupce
 
-`kind` = REV (reversal), REJ (odmítnutý kandidát s důvodem v `reject`), CONF (potvrzení), ZONE (zóna; `filled`, `bars_to_fill`, `fill_delta_z`).
+`kind` = REV (reversal), REJ (odmítnutý kandidát s důvodem v `reject`), CONF (platné potvrzení; řádek vzniká na svíčce, kterou se stalo platným, `conf_bar` = order-flow svíčka, `conf_wait_bars` = čekání na break), ZONE (zóna; `filled`, `bars_to_fill`, `fill_delta_z`), FIB (návrat do F5/F7 po BOS: `fib_level`, `fib_a`, `fib_b`, `fib_range_atr`, `fib_bars`, `had_conf`; T1 = OP).
+Break struktury: `bos_level`, `bos_anomaly`, `bos_bars` (od extrému), `bos_dist_atr`. Okno: `window` (rth / eth / prázdné).
 Features: `s_A`…`s_I`, surové hodnoty (`drop_atr`, `min_z`, `sweep`, `overshoot_atr`, `div1`, `div2`, `flip`, `poc_pos`, `third_pct`, `rho`, `fin_auction`, `clv`, `flush_z`, `stall_*`), úroveň (`level`, `level_dist_ticks`, `confluence`, `bars_beyond`, `test_order`), kontext (`vwap_side`, `vwap_slope_atr`, `vwap_dist_atr`, `min_from_rth`, `news`).
 Výsledky: `mfe_3…36`, `mae_3…36` (ticky), `hit_T1/T2/T3/R15/R2` (+ `hit_tol_*`, `bars_*`, `mindist_*`), `stop_hit`, `result_r` (výstup T1), `result_r15` (výstup 1,5R), `class` (v-reversal / base-breakout / failure), `breakout_vol_pct`, `p_model`.
 Záznamy spojuje `context_id`.

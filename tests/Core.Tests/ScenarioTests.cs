@@ -19,24 +19,26 @@ namespace ReversalConfirmation.Tests
         {
             public Synthetic S;
             public double P, Level;
-            public int RevBar, ConfBar;
+            public int RevBar, ConfBar, PivotBar;
         }
 
         /// <summary>Initiative sell-off into a level, flush below it, reclaim (2-bar), confirmation, pullback fill, rally.</summary>
-        private static Scenario FlushReclaim(Action<Synthetic, double> afterReclaim = null, bool reclaim = true)
+        /// <param name="anomaly">true: the reclaim bar's high is above the flush bar's high (outside bar), so the BOS level
+        /// is that high and C1 breaks it; false: the BOS level is the last lower high (p + 3) far above C1.</param>
+        private static Scenario FlushReclaim(Action<Synthetic, double> afterReclaim = null, bool reclaim = true, bool anomaly = true)
         {
             var s = new Synthetic(7, SessionStart, 5000);
             while (s.Time < PatternTime) s.Noise(1);
             double p = s.Price;
             var sc = new Scenario { S = s, P = p, Level = p - 6.0 };
             s.Add(p, p + 1.5, p - 0.25, p + 1.25, 900, 100);
-            s.Add(p + 1.25, p + 3, p + 1, p + 2.75, 900, 150);
+            sc.PivotBar = s.Add(p + 1.25, p + 3, p + 1, p + 2.75, 900, 150).Index;   // last lower high left of the low
             s.Add(p + 2.75, p + 3, p + 0.5, p + 0.75, 2500, -700, 0.3);        // origin: first red bar, open = T1
             s.Add(p + 0.75, p + 1, p - 1.5, p - 1.25, 2500, -700, 0.3);
             s.Add(p - 1.25, p - 1, p - 3.5, p - 3.25, 2500, -700, 0.3);
             s.Add(p - 3.25, p - 3, p - 5.5, p - 5.25, 2500, -600, 0.3);
             s.Add(p - 5.25, p - 5, p - 6.75, p - 6.5, 4000, -1600, 0.15);       // flush through the level, close below
-            var rev = s.Add(p - 6.5, p - 4.75, p - 6.75, reclaim ? p - 5.0 : p - 6.25, 3000, 700, 0.2); // reclaim
+            var rev = s.Add(p - 6.5, anomaly ? p - 4.75 : p - 5.0, p - 6.75, reclaim ? p - 5.0 : p - 6.25, 3000, 700, 0.2); // reclaim
             sc.RevBar = rev.Index;
             if (afterReclaim != null)
             {
@@ -74,6 +76,66 @@ namespace ReversalConfirmation.Tests
             foreach (var b in bars) e.OnBar(b);
             e.Flush();
             return e;
+        }
+
+        [Fact]
+        public void Confirmation_WithoutBreakOfStructure_WaitsAndBecomesValidOnTheBreak()
+        {
+            var sc = FlushReclaim(anomaly: false);
+            var sink = new MemorySink();
+            var e = Run(sc.S.Bars, Settings(sc, onlyManual: true), sink);
+
+            var rev = e.Marks.Single(m => m.Type == MarkType.Reversal && m.Bar == sc.RevBar);
+            var line = e.Structures.Single(l => l.ContextId == rev.ContextId);
+            Assert.Equal(sc.PivotBar, line.PivotBar);
+            Assert.Equal(sc.P + 3, line.Price, 6);
+            Assert.False(line.Anomaly);
+
+            // order flow on the C1 candle, the close above the pivot comes 5 bars later (25 min < 30 min)
+            int breakBar = sc.ConfBar + 5;
+            Assert.Equal(breakBar, line.BreakBar);
+            var c1 = e.Marks.Single(m => m.Type == MarkType.Confirmation && m.ContextId == rev.ContextId && m.Label == "C1");
+            Assert.Equal(sc.ConfBar, c1.Bar);
+            Assert.False(c1.Pending);
+            Assert.False(c1.Expired);
+            Assert.Equal(breakBar, c1.ValidBar);
+            Assert.Contains("PLATNÉ", c1.Tooltip);
+            Assert.Contains(e.Events, ev => ev.Type == EngineEventType.ConfirmationPending && ev.Bar == sc.ConfBar);
+            Assert.Contains(e.Events, ev => ev.Type == EngineEventType.Confirmation && ev.Bar == breakBar);
+            Assert.DoesNotContain(e.Events, ev => ev.Type == EngineEventType.Confirmation && ev.Bar < breakBar);
+            var bos = e.Marks.Single(m => m.Type == MarkType.StructureBreak && m.ContextId == rev.ContextId);
+            Assert.Equal(breakBar, bos.Bar);
+            Assert.Equal(sc.P + 3, bos.Price, 6);
+
+            // statistics enter on the close of the breaking candle, not on the order-flow candle
+            var conf = sink.Rows.First(r => r.Get("kind") == "CONF");
+            Assert.Equal(breakBar.ToString(), conf.Get("bar"));
+            Assert.Equal("5", conf.Get("conf_wait_bars"));
+        }
+
+        [Fact]
+        public void Confirmation_ExpiresWhenTheBreakDoesNotComeInTime()
+        {
+            var sc = FlushReclaim((s, p) =>
+            {
+                s.Add(p - 5.0, p - 2.75, p - 5.25, p - 3.0, 3000, 300, 0.4);   // order-flow confirmation, below the pivot p + 3
+                for (int i = 0; i < 10; i++) s.Add(p - 3.0, p - 2.5, p - 3.5, p - 3.0, 1200, 0, 0.5);   // no break
+                s.Noise(20);
+            }, anomaly: false);
+            var sink = new MemorySink();
+            var e = Run(sc.S.Bars, Settings(sc, onlyManual: true), sink);
+
+            var rev = e.Marks.Single(m => m.Type == MarkType.Reversal && m.Bar == sc.RevBar);
+            var c1 = e.Marks.Single(m => m.Type == MarkType.Confirmation && m.ContextId == rev.ContextId);
+            Assert.True(c1.Expired);
+            Assert.Equal(-1, c1.ValidBar);
+            Assert.Equal(c1.Bar + 6, c1.ExpiredBar);
+            Assert.Contains("NEPLATNÉ", c1.Tooltip);
+            Assert.DoesNotContain(e.Events, ev => ev.Type == EngineEventType.Confirmation);
+            Assert.DoesNotContain(sink.Rows, r => r.Get("kind") == "CONF");
+            var line = e.Structures.Single(l => l.ContextId == rev.ContextId);
+            Assert.Equal(-1, line.BreakBar);
+            Assert.False(line.Live);
         }
 
         [Fact]
@@ -276,9 +338,12 @@ namespace ReversalConfirmation.Tests
             s.Add(p - 5.25, p - 5, p - 6.75, p - 6.5, 4000, -1600, 0.15);
             var rev = s.Add(p - 6.5, p - 4.75, p - 6.75, p - 5.0, 3000, 700, 0.2);
             s.Noise(20);
-            var st = new EngineSettings { ManualLevels = (p - 6.0).ToString(System.Globalization.CultureInfo.InvariantCulture) };
+            var st = new EngineSettings { ManualLevels = (p - 6.0).ToString(System.Globalization.CultureInfo.InvariantCulture), Window = TradeWindow.All };
             Assert.Contains(Run(s.Bars, st).Marks, m => m.Type == MarkType.Reversal && m.Bar == rev.Index);
-            st.SignalSession = SessionMode.Rth;
+            // 03:00 ET = 09:00 Prague: inside the European (ETH) window, outside RTH
+            st.Window = TradeWindow.Eth;
+            Assert.Contains(Run(s.Bars, st).Marks, m => m.Type == MarkType.Reversal && m.Bar == rev.Index);
+            st.Window = TradeWindow.Rth;
             Assert.DoesNotContain(Run(s.Bars, st).Marks, m => m.Type == MarkType.Reversal && m.Bar == rev.Index);
         }
     }

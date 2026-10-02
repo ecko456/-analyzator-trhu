@@ -67,6 +67,25 @@ namespace ReversalConfirmation.Tests
 
     public class SessionTests
     {
+        [Theory]
+        [InlineData(2026, 2, 4, 14, 30, true, false)]    // 09:30 EST = 15:30 Prague: RTH window opens
+        [InlineData(2026, 2, 4, 14, 25, false, false)]   // 15:25 Prague: between the windows
+        [InlineData(2026, 2, 4, 21, 10, true, false)]    // 22:10 Prague: last bar before 22:12
+        [InlineData(2026, 2, 4, 21, 15, false, false)]
+        [InlineData(2026, 2, 4, 7, 0, false, true)]      // 08:00 Prague: European window opens
+        [InlineData(2026, 2, 4, 13, 55, false, true)]    // 14:55 Prague
+        [InlineData(2026, 2, 4, 14, 0, false, false)]    // 15:00 Prague: European window closed
+        [InlineData(2026, 3, 10, 13, 30, true, true)]    // US already on summer time: RTH opens 14:30 Prague (overlaps ETH)
+        [InlineData(2026, 7, 15, 13, 30, true, false)]   // both on summer time: 15:30 Prague
+        [InlineData(2026, 7, 15, 6, 0, false, true)]     // 08:00 CEST
+        public void TradingWindows_FollowTheTradersClockAndTheExchange(int y, int mo, int d, int h, int mi, bool rth, bool eth)
+        {
+            var bt = Clock().Resolve(new DateTime(y, mo, d, h, mi, 0, DateTimeKind.Utc));
+            Assert.Equal(rth, bt.InRthWindow);
+            Assert.Equal(eth, bt.InEthWindow);
+            Assert.Equal(rth, bt.InWindow);   // default window = RTH
+        }
+
         private static SessionClock Clock() => new SessionClock(new EngineSettings(), 5);
 
         [Theory]

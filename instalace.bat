@@ -49,9 +49,11 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo  3/3 Kopiruji kalibraci (namerene pravdepodobnosti) ...
+echo  3/3 Kopiruji kalibrace pro RTH, ETH a cely den ...
 if not exist "%APPDATA%\ATAS\ReversalConfirmation" mkdir "%APPDATA%\ATAS\ReversalConfirmation"
-copy /Y "calibration\es_m5_2024-07_2026-06.json" "%APPDATA%\ATAS\ReversalConfirmation\calibration.json" >nul
+copy /Y "calibration\es_m5_rth.json" "%APPDATA%\ATAS\ReversalConfirmation\calibration_rth.json" >nul
+copy /Y "calibration\es_m5_eth.json" "%APPDATA%\ATAS\ReversalConfirmation\calibration_eth.json" >nul
+copy /Y "calibration\es_m5_all.json" "%APPDATA%\ATAS\ReversalConfirmation\calibration.json" >nul
 
 echo.
 echo  Hotovo. Spust (restartuj) ATAS a na graf ES M5 pridej indikator

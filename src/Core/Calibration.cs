@@ -62,6 +62,8 @@ namespace ReversalConfirmation.Core
         public readonly List<Bucket> Zone = new List<Bucket>();
         public int MinSamples = 30;
         public string Source;
+        /// <summary>Trading window the calibration was measured in ("rth", "eth"; empty = whole day).</summary>
+        public string Window = "";
 
         public double ReversalProbability(double score) => Lookup(Reversal, score);
         public double ZoneProbability(double score) => Lookup(Zone, score);
@@ -84,6 +86,7 @@ namespace ReversalConfirmation.Core
                 var root = doc.RootElement;
                 var c = new Calibration { Source = path };
                 if (root.TryGetProperty("min_samples", out var ms) && ms.TryGetInt32(out var msv)) c.MinSamples = msv;
+                if (root.TryGetProperty("window", out var wn) && wn.ValueKind == JsonValueKind.String) c.Window = wn.GetString() ?? "";
                 if (root.TryGetProperty("weights", out var w) && w.ValueKind == JsonValueKind.Object)
                 {
                     var arr = new double[9];

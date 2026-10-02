@@ -208,6 +208,38 @@ namespace ReversalConfirmation.Core
             else if (c.Score < _s.MinScore) c.Reject = "low score";
         }
 
+        /// <summary>
+        /// Structure level that has to break to confirm the reversal (oriented: for a bullish reversal a high).
+        /// Anomaly: the extreme candle is an outside bar (new low and high above the previous candle) - its high.
+        /// Standard: going left from the extreme, the first candle whose high is above the candle to its left
+        /// (the last lower high). Fallback when the whole lookback only falls: its highest high.
+        /// </summary>
+        public double StructureLevel(int dir, int extremeBar, out int pivotBar, out bool anomaly)
+        {
+            anomaly = false;
+            var a = O(extremeBar, dir);
+            if (_bars.Has(extremeBar - 1) && a.H > O(extremeBar - 1, dir).H)
+            {
+                anomaly = true;
+                pivotBar = extremeBar;
+                return a.H;
+            }
+            int stop = Math.Max(0, extremeBar - _s.BosLookback);
+            double maxH = double.MinValue;
+            pivotBar = extremeBar;
+            for (int j = extremeBar - 1; j > stop && _bars.Has(j - 1); j--)
+            {
+                var b = O(j, dir);
+                if (b.H > maxH) { maxH = b.H; pivotBar = j; }
+                if (b.H > O(j - 1, dir).H)
+                {
+                    pivotBar = j;
+                    return b.H;
+                }
+            }
+            return maxH > double.MinValue ? maxH : a.H;
+        }
+
         // ---------------- A: prior initiative move ----------------
         private void CompA(Candidate c)
         {

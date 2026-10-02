@@ -8,11 +8,17 @@ namespace ReversalConfirmation.Core
         Reversal,
         Confirmation,
         Retest,
+        FiboEntry,
+        /// <summary>Break of structure: end of the dotted pivot line (Price = the broken level).</summary>
+        StructureBreak,
         AbsorptionFailed,
         ContextCancelled
     }
 
-    /// <summary>Immutable chart marker. Once emitted it never changes (no repaint); state changes are new marks.</summary>
+    /// <summary>
+    /// Chart marker. Bar, type, label and price never change (no repaint). Only a confirmation waiting for the break of
+    /// structure has a life cycle, and it only moves forward: pending → valid (on the breaking candle) or expired.
+    /// </summary>
     public sealed class Mark
     {
         public int Bar;
@@ -26,6 +32,32 @@ namespace ReversalConfirmation.Core
         public bool Strong;
         public int ContextId;
         public string Tooltip;
+        /// <summary>Confirmation: order flow is there but the structure is not broken yet.</summary>
+        public bool Pending;
+        /// <summary>Confirmation: bar on which it became valid (= Bar when the BOS came first), -1 = not valid.</summary>
+        public int ValidBar = -1;
+        /// <summary>Confirmation: the break did not come in time (or the context ended first).</summary>
+        public bool Expired;
+        public int ExpiredBar = -1;
+    }
+
+    /// <summary>
+    /// The pivot a reversal has to break (BOS): bullish = last lower high left of the low A (or the high of A itself
+    /// in the outside-bar anomaly). Drawn dotted from the pivot while the setup is still alive, so the trader sees in
+    /// advance which level makes the confirmation valid. Fields only move forward.
+    /// </summary>
+    public sealed class StructureLine
+    {
+        public int ContextId, Dir, PivotBar, ReversalBar;
+        public double Price;
+        public double Score;
+        public bool Anomaly;
+        /// <summary>Last bar on which the level still mattered (break bar, or the last bar the setup was alive).</summary>
+        public int EndBar;
+        /// <summary>Bar that broke the level, -1 = not broken.</summary>
+        public int BreakBar = -1;
+        /// <summary>Still waiting for the break.</summary>
+        public bool Live = true;
     }
 
     public enum ZoneState
@@ -96,7 +128,10 @@ namespace ReversalConfirmation.Core
     {
         Reversal,
         Confirmation,
+        ConfirmationPending,
         Retest,
+        FiboEntry,
+        StructureBreak,
         NewZone,
         ZoneFilled,
         ContextCancelled,

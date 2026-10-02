@@ -18,7 +18,7 @@ namespace ReversalConfirmation.Core
         {
             var c = new List<string>
             {
-                "id", "kind", "context_id", "dir", "variant", "bar", "time_utc", "time_et", "session", "min_from_rth", "rth", "news",
+                "id", "kind", "context_id", "dir", "variant", "bar", "time_utc", "time_et", "session", "min_from_rth", "rth", "window", "news",
                 "score", "strong", "reject",
                 "level", "level_price", "level_weight", "level_dist_ticks", "confluence", "bars_beyond", "test_order",
                 "atr", "atr_classic", "tod_baseline", "volume", "volume_pct", "delta", "delta_z",
@@ -27,6 +27,8 @@ namespace ReversalConfirmation.Core
                 "rho", "fin_auction", "clv", "flush_z", "flush_vol_pct", "stall_bars", "stall_z", "stall_eff_pct",
                 "vwap_side", "vwap_slope_atr", "vwap_dist_atr",
                 "rev_score", "conf_score", "conf_n", "conf_delta_z", "conf_clv", "conf_eff_pct", "conf_imbalances", "conf_vol_pct", "conf_warning",
+                "bos_level", "bos_anomaly", "bos_bars", "bos_dist_atr", "conf_bar", "conf_wait_bars",
+                "fib_level", "fib_a", "fib_b", "fib_range_atr", "fib_bars", "had_conf",
                 "zone_type", "zone_price", "zone_score", "zone_retest", "p_model", "filled", "bars_to_fill", "fill_delta_z",
                 "entry", "stop", "r_ticks", "t1", "t2", "t3", "t_first", "rr_first"
             };
