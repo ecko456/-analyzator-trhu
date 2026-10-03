@@ -729,7 +729,7 @@ namespace ReversalConfirmation.Core
             {
                 Row = row, Dir = ctx.Dir, Kind = "FIB", EntryBar = t, Entry = entry, Stop = plan.Stop, R = r, Tick = Tick,
                 TolTarget = Math.Max(S.TargetTolTicks * Tick, S.TargetTolAtr * ctx.Atr),
-                Horizons = S.Horizons, VBars = S.VReversalBars, Primary = 0, AdaptiveRange = range
+                Horizons = S.Horizons, VBars = S.VReversalBars, Primary = 0, AdaptiveRange = S.FibAdaptiveOp ? range : double.NaN
             };
             tr.Targets[0] = op;
             tr.Targets[1] = tr.Targets[2] = double.NaN;

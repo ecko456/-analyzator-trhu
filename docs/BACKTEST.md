@@ -77,6 +77,19 @@ Plán obchodníka: limit vždy 1 tick před F5 / F7 (fill, jakmile cena limit do
 
 OP zasažen: F7 22–24 % (RTH) a 35–43 % (ETH) při mediánu RR 3,6–4,2; F5 31–32 % a 42–48 % při RR 2,2–2,4. Medián SL: F7 18–21 t (RTH) a 9–12 t (ETH), F5 31–35 t a 16–20 t. S původním stopem (max(2 t, 0,05 ATR) pod A) a pevným OP byl RTH F7 o něco lepší (+0,29 / +0,13 na OP), ETH podobné; těsnější stop víc vybírá knoty. Tooltip počítá kontrakty jako ⌊risk / (ticky SL × hodnota ticku)⌋, výchozí risk 100 $, ES 12,50 $ a MES 1,25 $ za tick.
 
+### Velikost stopu a další detaily plánu
+
+Stejné obchody, mění se jen počet ticků SL za A (výstup na OP, net, R; Δ = párový rozdíl proti 1 ticku ± chyba):
+
+| | 1 t | 2 t | 3 t | 4 t | 6 t |
+|---|---:|---:|---:|---:|---:|
+| RTH F7 trénink / test | +0,11 / +0,09 | Δ −0,03 ± 0,02 / +0,04 ± 0,06 | Δ −0,07 / +0,01 | Δ −0,07 / −0,03 | Δ +0,07 / −0,07 |
+| ETH F7 trénink / test | +0,36 / +0,80 | Δ −0,07 ± 0,03 / −0,03 ± 0,07 | Δ −0,15 / +0,03 | Δ −0,19 / −0,06 | Δ −0,24 / −0,20 |
+| RTH F5 trénink / test | +0,06 / −0,02 | Δ −0,01 / +0,02 | Δ −0,04 / −0,00 | Δ −0,05 / −0,02 | Δ +0,00 / −0,04 |
+| ETH F5 trénink / test | +0,16 / +0,42 | Δ −0,03 / −0,01 | Δ −0,07 / −0,01 | Δ −0,07 / −0,04 | Δ −0,10 / −0,10 |
+
+Větší stop výsledek nezlepšil; 1 tick je stejně dobrý nebo lepší (v ETH průkazně v tréninku). Vstup přímo na F místo 1 tick před: RTH F7 +0,20 / +0,17, ETH F7 +0,47 / +0,61. Pevný OP od vstupu místo adaptivního: RTH F7 +0,13 / −0,00, ETH F7 +0,18 / +0,90. Rozdíly jsou v rámci šumu (±0,2–0,3), adaptivní OP zůstává výchozí (`FibAdaptiveOp`).
+
 ## Break režim od 17:45 (RTH)
 
 Od 17:45 pražského času se nečeká na order-flow svíčku C: signálem je samotný break struktury (čtvereček B), statistika vstupuje na close svíčky s breakem a order flow této svíčky dává skóre 0–100 (stejné složky jako u C, nesplněné podmínky C se odečtou: delta −15, close location −10, efektivita −10, close pod předchozí −5).

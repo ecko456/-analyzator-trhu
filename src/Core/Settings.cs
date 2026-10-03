@@ -247,6 +247,8 @@ namespace ReversalConfirmation.Core
         public int FibMaxBars = 36;
         /// <summary>The limit sits this many ticks before F5 / F7 (bullish above the level), so it fills even if price only just reaches it.</summary>
         public int FibEntryOffsetTicks = 1;
+        /// <summary>OP = C + A→B with C the extreme of the correction so far (true), or fixed from the entry level (false).</summary>
+        public bool FibAdaptiveOp = true;
         /// <summary>Stop this many ticks beyond A (bullish below the low of A).</summary>
         public int FibStopTicks = 1;
 
