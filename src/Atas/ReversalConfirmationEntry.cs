@@ -28,6 +28,12 @@ namespace ReversalConfirmation.Atas
         [Display(Name = "Celý den")] All
     }
 
+    public enum ProfileChoice
+    {
+        [Display(Name = "Volume profile (objem na ceně)")] Volume,
+        [Display(Name = "Market profile (TPO, 30 min)")] Tpo
+    }
+
     public enum AtrChoice
     {
         [Display(Name = "Klasický ATR14")] Classic,
@@ -166,6 +172,32 @@ namespace ReversalConfirmation.Atas
         [Display(Name = "Váha: předchozí den VAH/VAL", GroupName = GLevels, Order = 90)]
         [Range(0, 2)]
         public decimal WPrevDayVa { get => (decimal)_s.WPrevDayVa; set { _s.WPrevDayVa = (double)value; RecalculateValues(); } }
+
+        [Display(Name = "Value area z", GroupName = GLevels, Order = 91, Description = "Jak se počítá POC a hodnotová oblast (70 %) všech profilů: z objemu na ceně (VP), nebo z TPO jako v Market Profile (v kolika 30min periodách cena obchodovala).")]
+        public ProfileChoice ProfileType { get => (ProfileChoice)_s.ProfileType; set { _s.ProfileType = (ProfileSource)value; RecalculateValues(); } }
+
+        [Display(Name = "Váha: dnešní VAH/VAL/POC (developing)", GroupName = GLevels, Order = 92, Description = "V RTH z RTH profilu, před open z Globex session. Počítá se až po hodině profilu.")]
+        [Range(0, 2)]
+        public decimal WDevVa { get => (decimal)_s.WDevVa; set { _s.WDevVa = (double)value; RecalculateValues(); } }
+
+        [Display(Name = "Váha: VAH/VAL/POC tohoto týdne", GroupName = GLevels, Order = 93, Description = "Developing týdenní profil, od druhé session týdne.")]
+        [Range(0, 2)]
+        public decimal WWeekVa { get => (decimal)_s.WWeekVa; set { _s.WWeekVa = (double)value; RecalculateValues(); } }
+
+        [Display(Name = "Váha: VAH/VAL/POC předchozího týdne", GroupName = GLevels, Order = 94)]
+        [Range(0, 2)]
+        public decimal WPrevWeekVa { get => (decimal)_s.WPrevWeekVa; set { _s.WPrevWeekVa = (double)value; RecalculateValues(); } }
+
+        [Display(Name = "Týdenní profil z", GroupName = GLevels, Order = 95, Description = "ETH = všechny obchody týdne, RTH = jen RTH.")]
+        public SessionChoice WeekProfile { get => (SessionChoice)_s.WeekProfile; set { _s.WeekProfile = (SessionMode)value; RecalculateValues(); } }
+
+        [Display(Name = "Váha: nahé VAH/VAL/POC", GroupName = GLevels, Order = 96, Description = "VAH, VAL a POC dřívějších dní, na kterých cena od uzavření jejich profilu ani jednou neobchodovala.")]
+        [Range(0, 2)]
+        public decimal WNakedVa { get => (decimal)_s.WNakedVa; set { _s.WNakedVa = (double)value; RecalculateValues(); } }
+
+        [Display(Name = "Nahé úrovně: max. stáří (dní)", GroupName = GLevels, Order = 97)]
+        [Range(2, 60)]
+        public int NakedMaxDays { get => _s.NakedMaxDays; set { _s.NakedMaxDays = value; RecalculateValues(); } }
 
         [Display(Name = "Váha: overnight high/low", GroupName = GLevels, Order = 100)]
         [Range(0, 2)]

@@ -12,17 +12,17 @@ Po odečtení nákladů (1,4 ticku na obchod), výstup na 1,5 R, v R na obchod. 
 
 | vstup | RTH trénink / test | ETH trénink / test |
 |---|---:|---:|
-| **limit na VPOC retestu (R)** | **+0,21 / +0,70** | **+0,29 / +0,55** |
-| **limit F7 po breaku struktury, bez platného C** | **+0,25 / +0,44** | **+0,34 / +0,63** |
-| limit F7 po breaku, s platným C1/C2 | +0,05 / +0,22 | +0,12 / +0,35 |
-| limit F5 po breaku, bez platného C | +0,15 / −0,22 | +0,21 / +0,34 |
-| trhem po platném C1/C2 (close svíčky s breakem) | −0,10 / −0,07 | −0,02 / −0,07 |
+| **limit na VPOC retestu (R)** | **+0,18 / +0,57** | **+0,29 / +0,46** |
+| **limit F7 po breaku struktury, bez platného C** | **+0,20 / +0,28** | **+0,32 / +0,61** |
+| limit F7 po breaku, s platným C1/C2 | +0,09 / +0,36 | +0,13 / +0,43 |
+| limit F5 po breaku, bez platného C | +0,14 / −0,19 | +0,18 / +0,31 |
+| trhem po platném C1/C2 (close svíčky s breakem) | −0,08 / −0,04 | −0,03 / −0,05 |
 
-RTH = 15:30–22:12, ETH = 08:00–15:00 pražského času. Podrobnosti, počty obchodů a chyby odhadu jsou v [docs/BACKTEST.md](docs/BACKTEST.md).
+Výchozí nastavení včetně market/volume profile úrovní. RTH = 15:30–22:12, ETH = 08:00–15:00 pražského času. Podrobnosti, počty obchodů a chyby odhadu jsou v [docs/BACKTEST.md](docs/BACKTEST.md).
 
 **Doporučení z dat:**
-* Vstupovat přes **R (retest)** nebo **limitem do F7** po breaku struktury. Vzorky F7 jsou malé (23–73 obchodů na řez), ber je jako indicii, ne jistotu.
-* Platné C1/C2 je filtr (cena po něm dojde k originu pohybu v 61–78 % případů), ne vstup trhem: stop pod A je po breaku daleko.
+* Vstupovat přes **R (retest)** nebo **limitem do F7** po breaku struktury. Vzorky F7 jsou malé (24–77 obchodů na řez), ber je jako indicii, ne jistotu.
+* Platné C1/C2 je filtr (cena po něm dojde k originu pohybu v 62–79 % případů), ne vstup trhem: stop pod A je po breaku daleko.
 * Samotný reversal (tečka) je jen kontext.
 
 ## Instalace (Windows)
@@ -46,6 +46,8 @@ Ručně:
 5. Na grafu ES (M5, cluster/footprint data) přidej indikátor **Reversal & Confirmation Entry**. Aby fungovalo srovnání podle času dne, načti aspoň ~12 dní historie (D = 10).
 
 ## Co indikátor kreslí
+
+Referenční úrovně zahrnují i **market / volume profile**: VAH/VAL/POC předchozího dne, dnešní developing, tohoto a předchozího týdne a nahé (netestované) VAH/VAL/POC posledních 10 dní. Value area z objemu nebo z TPO. Výsledky na datech jsou v [BACKTEST](docs/BACKTEST.md#market-a-volume-profile-úrovně).
 
 Výchozí zobrazení je minimalistické: agent jen označí svíčky, které nejlépe splňují podmínky obratu. Srozumitelný popis všeho najdeš v brožurce [docs/Brozurka.html](docs/Brozurka.html) (otevři v prohlížeči).
 
@@ -75,6 +77,8 @@ Alerty (zvuk + popup): ve výchozím stavu platné C1/C2, C1/C2 čekající na b
 | | časy zpráv · okno | 08:30; 10:00; 14:00 ET · ±5 min |
 | Úrovně | váhy | prior VWAP 1,0 · session VWAP 1,0 · ±1σ/±2σ 0,6 · 1. RTH svíčka 1,0 · OR15/OR30/IB 0,8 · RTH open 0,8 · předchozí den H/L 0,9, POC 1,0, VAH/VAL 0,9 · overnight 0,8 · pool 0,7 · swing 0,6 · ruční 1,0 |
 | | tolerance testu | max(2 ticky, 0,15 × ATR) |
+| | value area z · týdenní profil | volume profile (nebo TPO) · ETH |
+| | profily: dnešní developing · tento týden · předchozí týden · nahé VAH/VAL/POC (max. stáří) | 0,7 · 0,8 · 0,9 · 1,0 (10 dní) |
 | Reversal | váhy A–I | 8;15;12;8;15;7;7;15;13 |
 | | sloučené svíčky · stall | 2 · zapnuto |
 | | A: K barů · pohyb · z delty | 6 · 2,0 × ATR · 2 |
@@ -134,12 +138,12 @@ Replay zvládne ~140 000 svíček za ~10 s a ošetřuje kvartální rolly.
 ## Vývoj
 
 ```bash
-dotnet test tests/Core.Tests -c Release                                          # 34 testů
+dotnet test tests/Core.Tests -c Release                                          # 38 testů
 dotnet build src/Atas/ReversalConfirmation.Atas.csproj -c Release -p:AtasStubs=true  # kontrola kompilace bez ATAS
 dotnet build tools/AtasHarness -c Release -p:AtasStubs=true                        # simulace volání ATAS + měření výkonu
 ```
 
-Testy obsahují scénáře podle akceptačních případů ze zadání: 2-bar flush + reclaim s H, „no reclaim" (Den 2 16:45), „no level" (Den 3 18:45), zrušení kontextu novým low, retest → C2 (Den 3 19:35/19:40), stall přes I (Den 2 16:20). Dál break struktury (C1 čeká a stane se platným na svíčce s breakem, C1 bez breaku do 30 min vyprší, anomálie), obchodní okna RTH/ETH v pražském čase včetně týdnů přechodu času, přesnou zrcadlovou symetrii bullish/bearish, žádný repaint, letní čas USA/EU a statistiky.
+Testy obsahují scénáře podle akceptačních případů ze zadání: 2-bar flush + reclaim s H, „no reclaim" (Den 2 16:45), „no level" (Den 3 18:45), zrušení kontextu novým low, retest → C2 (Den 3 19:35/19:40), stall přes I (Den 2 16:20). Dál profily (value area z objemu i TPO, nahé úrovně, týdenní přechod, developing VA), break struktury (C1 čeká a stane se platným na svíčce s breakem, C1 bez breaku do 30 min vyprší, anomálie), obchodní okna RTH/ETH v pražském čase včetně týdnů přechodu času, přesnou zrcadlovou symetrii bullish/bearish, žádný repaint, letní čas USA/EU a statistiky.
 
 `src/AtasStubs` je jen pro kontrolu kompilace mimo Windows: napodobuje část API ATAS (podle oficiálních zdrojů [AtasPlatform/Indicators](https://github.com/AtasPlatform/Indicators)) a do ATAS se nikdy nenahrává. Skutečný build běží proti DLL z instalace ATAS.
 

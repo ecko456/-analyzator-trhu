@@ -46,6 +46,9 @@ REV_FEATURES = [(c, 0, 1, 0) for c in S_COLS] + [
     ("vwap_dist_atr", -4, 4, 0),
     ("level_weight", 0, 1, 0),
     ("confluence", 0, 3, 0),
+    ("level_profile", 0, 1, 0),
+    ("profile_confluence", 0, 3, 0),
+    # level_naked is logged too, but reversals picked at a naked level are rare (~20-40 in two years): too few for a term
     ("overshoot_atr", 0, 2, 0),
     ("min_from_rth", 0, 390, 195),
 ]

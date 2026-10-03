@@ -23,6 +23,15 @@ namespace ReversalConfirmation.Core
         All
     }
 
+    /// <summary>How value areas are built.</summary>
+    public enum ProfileSource
+    {
+        /// <summary>Volume profile: traded volume at each price (from the footprint).</summary>
+        Volume,
+        /// <summary>Market profile: TPO count, i.e. in how many 30-minute periods the price traded.</summary>
+        Tpo
+    }
+
     public enum AtrMode
     {
         /// <summary>Wilder ATR(14) of the chart timeframe, exactly as in the spec.</summary>
@@ -125,6 +134,26 @@ namespace ReversalConfirmation.Core
         public int PoolBandTicks = 2;
         public int PoolLookback = 24;
         public int SwingStrength = 3;
+
+        // ---------------- Market / volume profile levels ----------------
+        /// <summary>Value areas from volume at price (VP) or from TPO counts (MP). Applies to every profile below.</summary>
+        public ProfileSource ProfileType = ProfileSource.Volume;
+        public double ValueAreaShare = 0.70;
+        public int TpoMinutes = 30;
+        /// <summary>Today's developing VAH / VAL / POC (RTH profile in RTH, the Globex session before the open).</summary>
+        public double WDevVa = 0.7;
+        /// <summary>Developing value area is used only after this many minutes of profile.</summary>
+        public int DevVaMinMinutes = 60;
+        /// <summary>This week's developing VAH / VAL / POC (from the second session of the week).</summary>
+        public double WWeekVa = 0.8;
+        /// <summary>Previous week's VAH / VAL / POC.</summary>
+        public double WPrevWeekVa = 0.9;
+        /// <summary>Profile of the weekly value areas: ETH = all trades of the week (default), RTH = only RTH.</summary>
+        public SessionMode WeekProfile = SessionMode.Eth;
+        /// <summary>Naked (virgin) VAH / VAL / POC of earlier days that price has not traded at since.</summary>
+        public double WNakedVa = 1.0;
+        /// <summary>How many sessions back naked levels are kept (the previous day is already a level of its own).</summary>
+        public int NakedMaxDays = 10;
 
         // ---------------- Reversal (layer 1) ----------------
         public bool EnableBullish = true;

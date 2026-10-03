@@ -68,6 +68,7 @@ namespace ReversalConfirmation.Tests
         {
             st.WPrevVwap = st.WSessionVwap = st.WVwapBands = st.WFirstRthBar = st.WOpeningRange = st.WRthOpen = 0;
             st.WPrevDayHl = st.WPrevDayPoc = st.WPrevDayVa = st.WOvernight = st.WLiquidityPool = st.WSwing = 0;
+            st.WDevVa = st.WWeekVa = st.WPrevWeekVa = st.WNakedVa = 0;
         }
 
         private static ReversalEngine Run(IEnumerable<Bar> bars, EngineSettings st, MemorySink sink = null)

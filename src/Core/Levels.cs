@@ -29,7 +29,19 @@ namespace ReversalConfirmation.Core
         EqualHighs,
         SwingHigh,
         SwingLow,
-        Manual
+        Manual,
+        DevVah,
+        DevVal,
+        DevPoc,
+        WeekVah,
+        WeekVal,
+        WeekPoc,
+        PrevWeekVah,
+        PrevWeekVal,
+        PrevWeekPoc,
+        NakedVah,
+        NakedVal,
+        NakedPoc
     }
 
     public struct RefLevel
@@ -37,23 +49,45 @@ namespace ReversalConfirmation.Core
         public LevelKind Kind;
         public double Price;
         public double Weight;
+        /// <summary>Naked levels: sessions since the profile they come from (2 = the day before yesterday).</summary>
+        public int Age;
 
-        public RefLevel(LevelKind kind, double price, double weight)
+        public RefLevel(LevelKind kind, double price, double weight, int age = 0)
         {
             Kind = kind;
             Price = price;
             Weight = weight;
+            Age = age;
         }
 
-        public string Name => LevelNames.Get(Kind);
+        public string Name => LevelNames.Get(Kind, Age);
+
+        /// <summary>Level from a market / volume profile (value area edge or POC of any profile).</summary>
+        public bool IsProfile => LevelNames.IsProfile(Kind);
+        public bool IsNaked => Kind == LevelKind.NakedVah || Kind == LevelKind.NakedVal || Kind == LevelKind.NakedPoc;
     }
 
     public static class LevelNames
     {
-        public static string Get(LevelKind k)
+        public static bool IsProfile(LevelKind k) =>
+            k == LevelKind.PrevDayPoc || k == LevelKind.PrevDayVah || k == LevelKind.PrevDayVal || k >= LevelKind.DevVah;
+
+        public static string Get(LevelKind k, int age = 0)
         {
             switch (k)
             {
+                case LevelKind.DevVah: return "Dnešní VAH (developing)";
+                case LevelKind.DevVal: return "Dnešní VAL (developing)";
+                case LevelKind.DevPoc: return "Dnešní POC (developing)";
+                case LevelKind.WeekVah: return "VAH tohoto týdne";
+                case LevelKind.WeekVal: return "VAL tohoto týdne";
+                case LevelKind.WeekPoc: return "POC tohoto týdne";
+                case LevelKind.PrevWeekVah: return "VAH předchozího týdne";
+                case LevelKind.PrevWeekVal: return "VAL předchozího týdne";
+                case LevelKind.PrevWeekPoc: return "POC předchozího týdne";
+                case LevelKind.NakedVah: return $"Nahý VAH (před {age} dny, netestovaný)";
+                case LevelKind.NakedVal: return $"Nahý VAL (před {age} dny, netestovaný)";
+                case LevelKind.NakedPoc: return $"Nahý POC (před {age} dny, netestovaný)";
                 case LevelKind.PrevVwap: return "VWAP předchozí session";
                 case LevelKind.SessionVwap: return "Session VWAP";
                 case LevelKind.VwapBand1: return "VWAP ±1σ";
@@ -106,11 +140,23 @@ namespace ReversalConfirmation.Core
         private Vwap _vwap = new Vwap();
         private double _prevVwap = double.NaN;
         private readonly List<double> _vwapHistory = new List<double>();
-        private Profile _profile = new Profile();
-        private bool _profileOpen;
+        private Profile _profile = new Profile();      // daily profile (RTH or ETH, see PriorDayProfile)
+        private Profile _ethProfile = new Profile();   // Globex session so far: today's developing VA before the RTH open
+        private bool _profileOpen, _dayFinal;
 
         // --- previous day profile ---
         private double _pdH = double.NaN, _pdL, _pdPoc, _pdVah, _pdVal;
+        private Profile.Result _today;                  // today's daily profile once it closed (RTH close / session end)
+
+        // --- weekly profiles ---
+        private Profile _week = new Profile();
+        private long _weekId = long.MinValue;
+        private int _weekSessions;                     // completed sessions in the current week
+        private double _pwVah = double.NaN, _pwVal, _pwPoc;
+
+        // --- naked (untested) value area edges and POCs of earlier days ---
+        private readonly List<(LevelKind kind, double price, int sessionNo)> _naked = new List<(LevelKind, double, int)>();
+        private int _sessionNo;
 
         // --- recent bars for pools and swings ---
         private readonly List<(int idx, double hi, double lo, long session)> _recent = new List<(int, double, double, long)>();
@@ -209,6 +255,8 @@ namespace ReversalConfirmation.Core
                 }
             }
 
+            AddProfileLevels(dst);
+
             if (s.WLiquidityPool > 0) AddPools(dst, atr);
 
             if (s.WSwing > 0)
@@ -222,6 +270,44 @@ namespace ReversalConfirmation.Core
         }
 
         private bool VwapActive() => _s.VwapSession == SessionMode.Eth || _rthStarted;
+
+        /// <summary>
+        /// Market / volume profile levels: today's developing value area, this week's and last week's value area and
+        /// naked VAH / VAL / POC of earlier days that price has not traded at since their session closed.
+        /// </summary>
+        private void AddProfileLevels(List<RefLevel> dst)
+        {
+            var s = _s;
+            if (s.WDevVa > 0)
+            {
+                // RTH profile once RTH runs (and after it closed), the Globex session profile before the open
+                var dev = s.PriorDayProfile == SessionMode.Eth || _rthStarted ? _profile : _ethProfile;
+                if (dev.Total > 0 && dev.ElapsedMinutes >= s.DevVaMinMinutes)
+                    AddVa(dst, dev.Compute(s.ValueAreaShare), LevelKind.DevVah, LevelKind.DevVal, LevelKind.DevPoc, s.WDevVa);
+            }
+            if (s.WWeekVa > 0 && _weekSessions >= 1 && _week.Total > 0)
+                AddVa(dst, _week.Compute(s.ValueAreaShare), LevelKind.WeekVah, LevelKind.WeekVal, LevelKind.WeekPoc, s.WWeekVa);
+            if (s.WPrevWeekVa > 0 && !double.IsNaN(_pwVah))
+            {
+                dst.Add(new RefLevel(LevelKind.PrevWeekVah, _pwVah, s.WPrevWeekVa));
+                dst.Add(new RefLevel(LevelKind.PrevWeekVal, _pwVal, s.WPrevWeekVa));
+                dst.Add(new RefLevel(LevelKind.PrevWeekPoc, _pwPoc, s.WPrevWeekVa));
+            }
+            if (s.WNakedVa > 0)
+                foreach (var n in _naked)
+                {
+                    int age = _sessionNo - n.sessionNo;
+                    // age 1 = the previous day, already a level of its own (PrevDayVah/Val/Poc)
+                    if (age >= 2 && age <= s.NakedMaxDays) dst.Add(new RefLevel(n.kind, n.price, s.WNakedVa, age));
+                }
+        }
+
+        private void AddVa(List<RefLevel> dst, Profile.Result r, LevelKind vah, LevelKind val, LevelKind poc, double w)
+        {
+            dst.Add(new RefLevel(vah, r.Vah * _tick, w));
+            dst.Add(new RefLevel(val, r.Val * _tick, w));
+            dst.Add(new RefLevel(poc, r.Poc * _tick, w));
+        }
 
         /// <summary>
         /// Equal lows / highs: at least two bars within the lookback whose extremes lie inside a narrow band and
@@ -338,15 +424,25 @@ namespace ReversalConfirmation.Core
 
             bool vwapOn = _s.VwapSession == SessionMode.Eth || t.IsRth;
             bool profileOn = _s.PriorDayProfile == SessionMode.Eth || t.IsRth;
-            for (int i = 0; i < b.Levels; i++)
+            if (vwapOn)
+                for (int i = 0; i < b.Levels; i++)
+                {
+                    double v = b.Bid[i] + b.Ask[i];
+                    if (v > 0) _vwap.Add(b.PriceAt(i), v);
+                }
+            var src = _s.ProfileType;
+            long period = t.SessionId * 1000 + (long)Math.Floor(t.MinutesFromEth / Math.Max(1, _s.TpoMinutes) + 1e-9);
+            if (profileOn)
             {
-                double v = b.Bid[i] + b.Ask[i];
-                if (v <= 0) continue;
-                double p = b.PriceAt(i);
-                if (vwapOn) _vwap.Add(p, v);
-                if (profileOn) _profile.Add((long)Math.Round(p / _tick), v);
+                _profile.AddBar(b, _tick, src, period, t.MinutesFromEth, _barMinutes);
+                _profileOpen = true;
             }
-            if (profileOn) _profileOpen = true;
+            else if (_profileOpen && !_dayFinal) FinalizeDay();   // RTH closed: from now on its levels can stay untested
+            _ethProfile.AddBar(b, _tick, src, period, t.MinutesFromEth, _barMinutes);
+            if (_s.WeekProfile == SessionMode.Eth || t.IsRth) _week.AddBar(b, _tick, src, period, t.MinutesFromEth, _barMinutes);
+            // a naked level that price traded at is no longer naked
+            for (int i = _naked.Count - 1; i >= 0; i--)
+                if (b.Low <= _naked[i].price + 1e-9 && b.High >= _naked[i].price - 1e-9) _naked.RemoveAt(i);
             if (_s.VwapSession == SessionMode.Rth && !t.IsRth && _rthStarted && _vwap.Volume > 0 && double.IsNaN(_closedRthVwap))
                 _closedRthVwap = _vwap.Value;
             if (_vwap.Volume > 0) _vwapHistory.Add(_vwap.Value);
@@ -358,6 +454,18 @@ namespace ReversalConfirmation.Core
         }
 
         private double _closedRthVwap = double.NaN;
+
+        /// <summary>Today's daily profile is complete: keep its result and start watching its levels for a first touch.</summary>
+        private void FinalizeDay()
+        {
+            _dayFinal = true;
+            _today = default;
+            if (_profile.Total <= 0) return;
+            _today = _profile.Compute(_s.ValueAreaShare);
+            _naked.Add((LevelKind.NakedVah, _today.Vah * _tick, _sessionNo));
+            _naked.Add((LevelKind.NakedVal, _today.Val * _tick, _sessionNo));
+            _naked.Add((LevelKind.NakedPoc, _today.Poc * _tick, _sessionNo));
+        }
 
         private void UpdateSwings(Bar b)
         {
@@ -400,12 +508,29 @@ namespace ReversalConfirmation.Core
                     if (!double.IsNaN(_closedRthVwap)) _prevVwap = _closedRthVwap;
                     else if (_rthStarted && _vwap.Volume > 0) _prevVwap = _vwap.Value;
                 }
-                if (_profileOpen && _profile.Total > 0)
+                if (_profileOpen && !_dayFinal) FinalizeDay();
+                if (_dayFinal && _today.Valid)
                 {
-                    var r = _profile.Compute(0.7);
-                    _pdH = r.high * _tick; _pdL = r.low * _tick; _pdPoc = r.poc * _tick; _pdVah = r.vah * _tick; _pdVal = r.val * _tick;
+                    _pdH = _today.High * _tick; _pdL = _today.Low * _tick; _pdPoc = _today.Poc * _tick;
+                    _pdVah = _today.Vah * _tick; _pdVal = _today.Val * _tick;
                 }
             }
+            // CME week: the Sunday evening session belongs to Monday; DateTime.MinValue is a Monday
+            long week = session / 7;
+            if (week != _weekId)
+            {
+                if (_weekId != long.MinValue && _week.Total > 0)
+                {
+                    var w = _week.Compute(_s.ValueAreaShare);
+                    _pwVah = w.Vah * _tick; _pwVal = w.Val * _tick; _pwPoc = w.Poc * _tick;
+                }
+                _week = new Profile();
+                _weekId = week;
+                _weekSessions = 0;
+            }
+            else _weekSessions++;
+            _sessionNo++;
+            _naked.RemoveAll(n => _sessionNo - n.sessionNo > _s.NakedMaxDays);
             _session = session;
             _rthStarted = _firstRthDone = _or15Done = _or30Done = _ibDone = false;
             _onHigh = double.MinValue;
@@ -414,7 +539,8 @@ namespace ReversalConfirmation.Core
             _vwap = new Vwap();
             _vwapHistory.Clear();
             _profile = new Profile();
-            _profileOpen = false;
+            _ethProfile = new Profile();
+            _profileOpen = _dayFinal = false;
             _swingHighs.Clear();
             _swingLows.Clear();
         }
@@ -424,6 +550,13 @@ namespace ReversalConfirmation.Core
         {
             if (!double.IsNaN(_prevVwap)) _prevVwap += offset;
             if (!double.IsNaN(_pdH)) { _pdH += offset; _pdL += offset; _pdPoc += offset; _pdVah += offset; _pdVal += offset; }
+            if (!double.IsNaN(_pwVah)) { _pwVah += offset; _pwVal += offset; _pwPoc += offset; }
+            long dk = (long)Math.Round(offset / _tick);
+            _profile.Shift(dk);
+            _ethProfile.Shift(dk);
+            _week.Shift(dk);
+            if (_today.Valid) _today = _today.Shifted(dk);
+            for (int i = 0; i < _naked.Count; i++) _naked[i] = (_naked[i].kind, _naked[i].price + offset, _naked[i].sessionNo);
             for (int i = 0; i < _recent.Count; i++) _recent[i] = (_recent[i].idx, _recent[i].hi + offset, _recent[i].lo + offset, _recent[i].session);
             for (int i = 0; i < _swingHighs.Count; i++) _swingHighs[i] = (_swingHighs[i].idx, _swingHighs[i].price + offset);
             for (int i = 0; i < _swingLows.Count; i++) _swingLows[i] = (_swingLows[i].idx, _swingLows[i].price + offset);
@@ -452,28 +585,90 @@ namespace ReversalConfirmation.Core
             }
         }
 
+        /// <summary>
+        /// Price profile in ticks. Volume mode adds the traded volume at each price; TPO mode adds one TPO for every price
+        /// a 30-minute period traded through (period low to high, as in Market Profile), counted incrementally per bar.
+        /// </summary>
         private sealed class Profile
         {
-            private readonly Dictionary<long, double> _vol = new Dictionary<long, double>();
-            public double Total;
+            public struct Result
+            {
+                public long High, Low, Poc, Vah, Val;
+                public bool Valid;
+                public Result Shifted(long dk) => new Result { High = High + dk, Low = Low + dk, Poc = Poc + dk, Vah = Vah + dk, Val = Val + dk, Valid = Valid };
+            }
 
-            public void Add(long key, double v)
+            private Dictionary<long, double> _vol = new Dictionary<long, double>();
+            public double Total;
+            private double _firstMinute = double.NaN, _lastMinute, _barMinutes;
+            private long _period = long.MinValue, _pLo, _pHi;
+
+            /// <summary>Minutes of trading the profile covers.</summary>
+            public double ElapsedMinutes => double.IsNaN(_firstMinute) ? 0 : _lastMinute - _firstMinute + _barMinutes;
+
+            public void AddBar(Bar b, double tick, ProfileSource src, long period, double minuteOfSession, double barMinutes)
+            {
+                if (double.IsNaN(_firstMinute) || minuteOfSession < _firstMinute) _firstMinute = minuteOfSession;
+                _lastMinute = Math.Max(_lastMinute, minuteOfSession);
+                _barMinutes = barMinutes;
+                if (src == ProfileSource.Volume)
+                {
+                    for (int i = 0; i < b.Levels; i++)
+                    {
+                        double v = b.Bid[i] + b.Ask[i];
+                        if (v > 0) Add((long)Math.Round(b.PriceAt(i) / tick), v);
+                    }
+                    return;
+                }
+                long lo = (long)Math.Round(b.Low / tick), hi = (long)Math.Round(b.High / tick);
+                if (period != _period)
+                {
+                    _period = period;
+                    for (long k = lo; k <= hi; k++) Add(k, 1);
+                    _pLo = lo;
+                    _pHi = hi;
+                    return;
+                }
+                // same period: only prices the period has not printed yet get a TPO
+                for (long k = lo; k < _pLo; k++) Add(k, 1);
+                for (long k = _pHi + 1; k <= hi; k++) Add(k, 1);
+                _pLo = Math.Min(_pLo, lo);
+                _pHi = Math.Max(_pHi, hi);
+            }
+
+            private void Add(long key, double v)
             {
                 _vol.TryGetValue(key, out var x);
                 _vol[key] = x + v;
                 Total += v;
             }
 
-            public (long high, long low, long poc, long vah, long val) Compute(double share)
+            public void Shift(long dk)
+            {
+                if (dk == 0) return;
+                var moved = new Dictionary<long, double>(_vol.Count);
+                foreach (var kv in _vol) moved[kv.Key + dk] = kv.Value;
+                _vol = moved;
+                _pLo += dk;
+                _pHi += dk;
+            }
+
+            /// <summary>POC and the value area grown from it, one price at a time toward the bigger neighbour.</summary>
+            public Result Compute(double share)
             {
                 long lo = long.MaxValue, hi = long.MinValue, poc = 0;
+                foreach (var k in _vol.Keys)
+                {
+                    if (k < lo) lo = k;
+                    if (k > hi) hi = k;
+                }
                 double best = -1;
                 foreach (var kv in _vol)
                 {
-                    if (kv.Key < lo) lo = kv.Key;
-                    if (kv.Key > hi) hi = kv.Key;
-                    if (kv.Value > best) { best = kv.Value; poc = kv.Key; }
+                    // ties (common with TPO counts): the price closer to the middle of the range wins
+                    if (kv.Value > best || (kv.Value == best && Math.Abs(2 * kv.Key - lo - hi) < Math.Abs(2 * poc - lo - hi))) { best = kv.Value; poc = kv.Key; }
                 }
+                if (best < 0) return default;
                 double acc = best, target = Total * share;
                 long a = poc, b = poc;
                 while (acc < target && (a > lo || b < hi))
@@ -483,7 +678,7 @@ namespace ReversalConfirmation.Core
                     if (up >= dn) { b++; acc += up; }
                     else { a--; acc += dn; }
                 }
-                return (hi, lo, poc, b, a);
+                return new Result { High = hi, Low = lo, Poc = poc, Vah = b, Val = a, Valid = true };
             }
 
             private double Get(long k) => _vol.TryGetValue(k, out var v) ? v : 0;

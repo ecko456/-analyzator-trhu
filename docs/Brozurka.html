@@ -365,6 +365,21 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
 
     <h3>Referenční úrovně</h3>
     <p>VWAP předchozí session, session VWAP a jeho pásma ±1σ a ±2σ, high a low první RTH svíčky, opening range 15 a 30 minut a initial balance, RTH open, high, low, POC, VAH a VAL předchozího dne, overnight high a low, equal highs a lows (liquidity pool), výrazné swingy dne a tvoje ruční úrovně. Když se v toleranci potká víc úrovní, skóre úrovně roste.</p>
+    <h3>Market a volume profile</h3>
+    <p>K tomu VAH, VAL a POC z profilů. Hodnotová oblast (value area) je 70 % obchodování kolem POC. Počítá se z objemu na ceně (volume profile), nebo přepnutím z TPO jako v Market Profile.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Profil</th><th>Co to je</th><th class="num">Váha</th></tr></thead>
+        <tbody>
+          <tr><td>Předchozí den</td><td>RTH profil včerejška</td><td class="num">0,9 / POC 1,0</td></tr>
+          <tr><td>Dnešní (developing)</td><td>V RTH z dnešního RTH profilu, před open z Globex session. Až po hodině profilu</td><td class="num">0,7</td></tr>
+          <tr><td>Tento týden</td><td>Developing týdenní profil (všechny obchody), od druhé session týdne</td><td class="num">0,8</td></tr>
+          <tr><td>Předchozí týden</td><td>Uzavřený profil minulého týdne</td><td class="num">0,9</td></tr>
+          <tr><td>Nahé (virgin)</td><td>VAH, VAL a POC z posledních 10 dní, na kterých cena od uzavření jejich profilu ani jednou neobchodovala. Po prvním dotyku zmizí</td><td class="num">1,0</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">Úroveň s nejvyšší vahou a blízkostí jde do komponenty B skóre. Ostatní profilové úrovně u lowu přidají konfluenci a tooltip je vypíše na řádku „Profil u lowu".</p>
 
     <h3>Devět komponent</h3>
     <div class="table-wrap">
@@ -465,15 +480,16 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
       <table>
         <thead><tr><th>Vstup (výstup na 1,5 R)</th><th class="num">RTH starší / test</th><th class="num">ETH starší / test</th><th>Závěr</th></tr></thead>
         <tbody>
-          <tr><td>Trhem po platném C1/C2 (close svíčky s breakem)</td><td class="num">−0,10 / −0,07</td><td class="num">−0,02 / −0,07</td><td>Bez výhody. Stop pod A je po breaku daleko</td></tr>
-          <tr><td>Limit F7 po breaku (bez C1)</td><td class="num good">+0,25 / +0,44</td><td class="num good">+0,34 / +0,63</td><td class="good">Tvoje metoda funguje, hlavně F7</td></tr>
-          <tr><td>Limit F7, jen když bylo i platné C1</td><td class="num">+0,05 / +0,22</td><td class="num">+0,12 / +0,35</td><td>Kladné, ale order flow tu nepřidal</td></tr>
-          <tr><td>Limit F5 po breaku (bez C1)</td><td class="num">+0,15 / −0,22</td><td class="num">+0,21 / +0,34</td><td>V RTH nespolehlivé</td></tr>
-          <tr><td>Limit na VPOC svíčky R (retest)</td><td class="num good">+0,21 / +0,70</td><td class="num good">+0,29 / +0,55</td><td class="good">Nejstabilnější v obou oknech</td></tr>
+          <tr><td>Trhem po platném C1/C2 (close svíčky s breakem)</td><td class="num">−0,08 / −0,04</td><td class="num">−0,03 / −0,05</td><td>Bez výhody. Stop pod A je po breaku daleko</td></tr>
+          <tr><td>Limit F7 po breaku (bez C1)</td><td class="num good">+0,20 / +0,28</td><td class="num good">+0,32 / +0,61</td><td class="good">Tvoje metoda funguje, hlavně F7</td></tr>
+          <tr><td>Limit F7, jen když bylo i platné C1</td><td class="num">+0,09 / +0,36</td><td class="num">+0,13 / +0,43</td><td>Kladné, order flow konzistentně nepřidal</td></tr>
+          <tr><td>Limit F5 po breaku (bez C1)</td><td class="num">+0,14 / −0,19</td><td class="num">+0,18 / +0,31</td><td>V RTH nespolehlivé</td></tr>
+          <tr><td>Limit na VPOC svíčky R (retest)</td><td class="num good">+0,18 / +0,57</td><td class="num good">+0,29 / +0,46</td><td class="good">Nejstabilnější v obou oknech</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="muted">Čísla jsou průměrný výsledek na obchod v R (1 R = vzdálenost ke stopu) <strong>po odečtení nákladů</strong> 1,4 ticku na obchod (komise a 1 tick skluzu). Četnost v jednom okně: R asi 0,3× za den, F7 asi 0,3× za den, platné C1/C2 0,5–0,7× za den. Vzorky F7 jsou malé (v RTH testu 23 obchodů), takže rozdíly ±0,2 R jsou v rámci šumu. Platné C1 má smysl hlavně jako filtr: cena po něm dojde k původu pohybu (T1) v 61–78 % případů.</p>
+    <p class="muted">Čísla jsou průměrný výsledek na obchod v R (1 R = vzdálenost ke stopu) <strong>po odečtení nákladů</strong> 1,4 ticku na obchod (komise a 1 tick skluzu). Četnost v jednom okně: R asi 0,3× za den, F7 asi 0,3× za den, platné C1/C2 0,5–0,7× za den. Vzorky F7 jsou malé (v RTH testu 24 obchodů), takže rozdíly ±0,2 R jsou v rámci šumu. Platné C1 má smysl hlavně jako filtr: cena po něm dojde k původu pohybu (T1) v 62–79 % případů.</p>
+    <p class="muted"><strong>Profilové úrovně</strong> (dnešní, týdenní, minulý týden a nahé VAH/VAL/POC) přidají asi 10–17 % teček. Reversaly na nich ale v datech nedopadly lépe ani hůř než na ostatních úrovních: T1 podobně (RTH kolem 28 %, ETH kolem 35 %), stejná reakce ceny, výsledky R a F7 beze změny v rámci šumu. Volume i TPO profil vyšly stejně. Na nahých úrovních bylo za 2 roky jen 16–44 reversalů v okně, na závěr je to málo.</p>
     <p class="note">Minulost nezaručuje budoucnost. Dva roky jednoho trhu jsou solidní vzorek, ale ne jistota. Ber agenta jako druhý pár očí, ne jako automat.</p>
   </section>
 
@@ -506,6 +522,8 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
           <tr><td>Tečkovaně pivot · neplatná potvrzení šedě</td><td class="mono">zapnuto</td><td>Vypni, pokud chceš ještě čistší graf</td></tr>
           <tr><td>Alert: C1/C2 platné · čeká na break · R · F</td><td class="mono">zapnuto</td><td>Zvuk a popup. Alert na samotný break a na tečku je vypnutý</td></tr>
           <tr><td>Kreslit vstupní zóny · stop a targety</td><td class="mono">vypnuto</td><td>Jen pokud chceš vidět zóny a SL/TP čáry</td></tr>
+          <tr><td>Value area z</td><td class="mono">volume profile</td><td>Market profile (TPO), pokud čteš trh přes TPO. V datech vyšly obě varianty stejně</td></tr>
+          <tr><td>Váhy profilů: dnešní · týden · minulý týden · nahé</td><td class="mono">0,7 · 0,8 · 0,9 · 1,0</td><td>0 = profil vypnout. Nahé úrovně se drží max. 10 dní</td></tr>
           <tr><td>Ruční úrovně</td><td class="mono">prázdné</td><td>Tvoje vlastní ceny oddělené středníkem, např. <span class="mono">7750;7735,5</span></td></tr>
           <tr><td>Kalibrační JSON</td><td class="mono">podle okna</td><td>Prázdné = sám vezme <span class="mono">calibration_rth.json</span> nebo <span class="mono">calibration_eth.json</span> (instalace je nakopíruje)</td></tr>
         </tbody>
@@ -528,6 +546,9 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
       <dt>ATR</dt><dd>Průměrný rozsah svíčky za posledních 14 svíček. Měřítko „normálního" pohybu.</dd>
       <dt>RTH / ETH</dt><dd>V nastavení <em>Obchoduji</em>: RTH = americká seance 15:30–22:12 našeho času, ETH = evropské dopoledne 8:00–15:00.</dd>
       <dt>Pivot high / LH</dt><dd>Svíčka, jejíž high vyčnívá nad svíčku nalevo. Poslední takový nižší high (lower high) vlevo od low je úroveň, kterou musí cena prorazit.</dd>
+      <dt>VAH / VAL</dt><dd>Horní a dolní hrana hodnotové oblasti profilu (70 % obchodování kolem POC).</dd>
+      <dt>Nahý (virgin) VAH/VAL/POC</dt><dd>Úroveň staršího profilu, na které cena od jeho uzavření ještě neobchodovala.</dd>
+      <dt>TPO</dt><dd>Time price opportunity: v Market Profile jedno „písmenko" za každou 30min periodu, ve které cena na dané úrovni obchodovala.</dd>
       <dt>BOS</dt><dd>Break of structure: close za posledním pivotem. Teprve tím se z obratu stává změna struktury.</dd>
       <dt>Anomálie</dt><dd>Svíčka A udělá nové low a zároveň high nad předchozí svíčkou (outside bar). Láme se pak rovnou high svíčky A.</dd>
       <dt>F5 / F7</dt><dd>Fibonacci návrat impulsu A→B: 61,8 % a 78,9 %.</dd>

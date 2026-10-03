@@ -1104,7 +1104,9 @@ namespace ReversalConfirmation.Core
             row.Set("variant", c.VariantName).Set("score", c.Score).Set("strong", c.Score >= S.StrongScore);
             if (c.HasLevel)
                 row.Set("level", c.Level.Kind.ToString()).Set("level_price", c.Level.Price).Set("level_weight", c.Level.Weight)
-                   .Set("level_dist_ticks", c.LevelDistTicks).Set("confluence", c.Confluence).Set("bars_beyond", c.BarsBeyond).Set("test_order", c.TestOrder);
+                   .Set("level_dist_ticks", c.LevelDistTicks).Set("confluence", c.Confluence).Set("bars_beyond", c.BarsBeyond).Set("test_order", c.TestOrder)
+                   .Set("level_profile", c.Level.IsProfile).Set("level_naked", c.Level.IsNaked).Set("level_age", c.Level.Age)
+                   .Set("profile_confluence", c.ProfileConfluence);
             string[] cols = { "s_A", "s_B", "s_C", "s_D", "s_E", "s_F", "s_G", "s_H", "s_I" };
             for (int i = 0; i < 9; i++) row.Set(cols[i], c.S[i]);
             row.Set("h_applicable", c.HApplicable).Set("i_applicable", c.IApplicable)
@@ -1153,6 +1155,16 @@ namespace ReversalConfirmation.Core
             if (!double.IsNaN(prob)) sb.Append('\n').Append("Úspěšnost podobných signálů (T1 před stopem): ").Append(F(prob * 100, "0")).Append(" %");
             sb.Append('\n').Append("Úroveň: ").Append(c.Level.Name).Append(' ').Append(F(c.Level.Price, "0.##"));
             if (c.Confluence > 0) sb.Append("  (+").Append(c.Confluence).Append(c.Confluence == 1 ? " další úroveň)" : " další úrovně)");
+            // market / volume profile context at the extreme besides the level that won component B
+            int shown = 0;
+            if (c.NearProfile != null)
+                foreach (var l in c.NearProfile)
+                {
+                    if (l.Kind == c.Level.Kind && Math.Abs(l.Price - c.Level.Price) < Tick / 2) continue;
+                    if (shown == 3) { sb.Append(" …"); break; }
+                    sb.Append(shown++ == 0 ? (bull ? "\nProfil u lowu: " : "\nProfil u highu: ") : " · ");
+                    sb.Append(l.Name).Append(' ').Append(F(l.Price, "0.##"));
+                }
             sb.Append('\n').Append("Varianta: ").Append(c.VariantName).Append(c.Variant switch
             {
                 Variant.OneBar => " (jedna svíčka)",

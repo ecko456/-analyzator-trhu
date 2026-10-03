@@ -43,7 +43,7 @@ Od této verze platí potvrzení C1/C2 až po **breaku struktury** (BOS) a sign�
 | **limit na VPOC retestu (R)** | **+0,21** ± 0,13 (93) | **+0,70** ± 0,16 (53) | **+0,29** ± 0,14 (75) | **+0,55** ± 0,18 (43) |
 | R, fill jen proobchodováním | +0,22 (89) | +0,56 (50) | +0,14 (67) | +0,54 (42) |
 
-V závorce počet obchodů (trénink 321 dní, test 183–184 dní). Četnost v jednom okně: tečka 4–6× za den, platné C 0,5–0,7×, R ~0,3×, F7 ~0,3×.
+V závorce počet obchodů (trénink 321 dní, test 183–184 dní). Tabulka je bez market/volume profile úrovní; s nimi (výchozí stav) viz další kapitola. Četnost v jednom okně: tečka 4–6× za den, platné C 0,5–0,7×, R ~0,3×, F7 ~0,3×.
 
 **Co z toho plyne:**
 
@@ -63,6 +63,38 @@ dotnet run -c Release --project tools/Replay -- --data data/fp5 --out runs/rth_f
 python calibration/calibrate.py runs/rth/log.csv --window rth --out calibration/es_m5_rth.json
 python calibration/calibrate.py runs/eth/log.csv --window eth --out calibration/es_m5_eth.json
 ```
+
+## Market a volume profile úrovně
+
+Nové referenční úrovně (výchozí váha): **dnešní developing VAH/VAL/POC** (0,7; v RTH z RTH profilu, před open z Globex session, až po 60 minutách profilu), **VAH/VAL/POC tohoto týdne** (0,8; developing, všechny obchody týdne, od druhé session), **předchozího týdne** (0,9) a **nahé VAH/VAL/POC** (1,0; z posledních 10 dní, na kterých cena od uzavření jejich profilu neobchodovala, po prvním dotyku zmizí). Value area 70 % z objemu (VP), nebo volitelně z TPO (MP, 30min periody). Úrovně vstupují do komponenty B (výběr úrovně, blízkost, konfluence) jako všechny ostatní.
+
+Net po nákladech, výstup 1,5 R, trénink / test:
+
+| | tečky / den | T1 | R (retest) | F7 | trhem po platném C |
+|---|---:|---:|---:|---:|---:|
+| RTH bez profilových úrovní | 5,8 / 5,2 | 28 % / 29 % | +0,21 / +0,70 | +0,14 / +0,31 | −0,10 / −0,07 |
+| RTH volume profile (výchozí) | 6,4 / 5,8 | 28 % / 28 % | +0,18 / +0,57 | +0,14 / +0,33 | −0,08 / −0,04 |
+| RTH TPO | 6,3 / 5,9 | 28 % / 29 % | +0,23 / +0,57 | +0,16 / +0,37 | −0,08 / −0,09 |
+| ETH bez profilových úrovní | 4,2 / 4,6 | 37 % / 32 % | +0,29 / +0,55 | +0,25 / +0,50 | −0,02 / −0,07 |
+| ETH volume profile (výchozí) | 4,9 / 5,3 | 36 % / 32 % | +0,29 / +0,46 | +0,25 / +0,52 | −0,03 / −0,05 |
+| ETH TPO | 4,8 / 5,3 | 36 % / 31 % | +0,29 / +0,42 | +0,27 / +0,43 | −0,08 / −0,07 |
+
+F7 zde zahrnuje vstupy s i bez platného C. Směrodatná chyba R je 0,13–0,18, F7 0,11–0,16.
+
+Reversaly podle rodiny vybrané úrovně (volume profile, oba roky, T1 trénink / test):
+
+| úroveň | RTH n | RTH T1 | ETH n | ETH T1 |
+|---|---:|---:|---:|---:|
+| ostatní (VWAP, OR/IB, H/L, pool, swing, ruční) | 2 178 | 29 % / 29 % | 1 543 | 36 % / 32 % |
+| předchozí den VAH/VAL/POC | 325 | 26 % / 27 % | 307 | 36 % / 30 % |
+| dnešní developing | 226 | 29 % / 29 % | 426 | 35 % / 36 % |
+| tento týden | 171 | 29 % / 17 % | 163 | 32 % / 25 % |
+| předchozí týden | 171 | 19 % / 28 % | 97 | 37 % / 27 % |
+| nahé VAH/VAL/POC | 33 | 10 % / 31 % | 16 | 9 % / 0 % |
+
+Medián reakce ceny po reversalu (MFE za 12 svíček) je u všech rodin 1,3–1,8 ATR, stop zasažen v 77–88 % do 36 svíček – bez rozdílu mezi profilovými a ostatními úrovněmi. Víc profilových úrovní u lowu (konfluence) T1 nezvýšilo (RTH 29 / 26 / 27 %, ETH 35 / 33 / 28 % pro 0 / 1 / 2+).
+
+**Co z toho plyne:** profilové úrovně přidají 10–17 % reversalů stejné kvality, výsledky vstupů se v rámci šumu nemění a VP i TPO vychází stejně. Nahých úrovní je v datech málo (cena k nim dojde zřídka), na závěr o nich to nestačí. Kalibrace dostala příznaky `level_profile` a `profile_confluence`, takže zobrazená úspěšnost jejich vliv započítá (koeficienty vyšly blízko nuly). Výchozí stav: VP úrovně zapnuté s umírněnými vahami, protože kvalitu nezhoršují a obchodník je chce vidět; tooltip tečky vypíše profilové úrovně u extrému na řádku „Profil u lowu/highu".
 
 ## Výsledky první verze (celý den, bez BOS)
 

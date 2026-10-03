@@ -33,6 +33,10 @@ namespace ReversalConfirmation.Core
         public RefLevel Level;
         public double LevelO;          // oriented level price
         public int Confluence;
+        /// <summary>Profile levels (VAH / VAL / POC of any profile) within the tolerance of the low, the picked one included.</summary>
+        public int ProfileConfluence;
+        /// <summary>Those profile levels (null when none), for the tooltip.</summary>
+        public List<RefLevel> NearProfile;
         public double LevelDistTicks;  // + = low stayed above the level, - = pierced
         public int BarsBeyond;
         public int TestOrder = 1;
@@ -328,7 +332,8 @@ namespace ReversalConfirmation.Core
             c.LevelO = c.Dir * levels[pick].Price;
             c.LevelDistTicks = (m.L - c.LevelO) / _tick;
 
-            int conf = 0;
+            int conf = 0, prof = 0;
+            if (levels[pick].IsProfile) { prof = 1; (c.NearProfile = new List<RefLevel>()).Add(levels[pick]); }
             for (int i = 0; i < levels.Count; i++)
             {
                 if (i == pick) continue;
@@ -336,9 +341,16 @@ namespace ReversalConfirmation.Core
                 bool dup = false;
                 for (int j = 0; j < i; j++)
                     if (j != pick && levels[j].Kind == levels[i].Kind && Math.Abs(levels[j].Price - levels[i].Price) < _tick / 2) dup = true;
-                if (!dup) conf++;
+                if (dup) continue;
+                conf++;
+                if (levels[i].IsProfile)
+                {
+                    prof++;
+                    (c.NearProfile ??= new List<RefLevel>()).Add(levels[i]);
+                }
             }
             c.Confluence = conf;
+            c.ProfileConfluence = prof;
             double bonus = Math.Min(_s.ConfluenceMax, _s.ConfluenceStep * conf);
             c.S[(int)Comp.B] = MathUtil.Clamp01(levels[pick].Weight * prox[pick] * (1 + bonus));
         }

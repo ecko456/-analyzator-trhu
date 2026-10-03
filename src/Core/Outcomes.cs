@@ -21,6 +21,7 @@ namespace ReversalConfirmation.Core
                 "id", "kind", "context_id", "dir", "variant", "bar", "time_utc", "time_et", "session", "min_from_rth", "rth", "window", "news",
                 "score", "strong", "reject",
                 "level", "level_price", "level_weight", "level_dist_ticks", "confluence", "bars_beyond", "test_order",
+                "level_profile", "level_naked", "level_age", "profile_confluence",
                 "atr", "atr_classic", "tod_baseline", "volume", "volume_pct", "delta", "delta_z",
                 "s_A", "s_B", "s_C", "s_D", "s_E", "s_F", "s_G", "s_H", "s_I", "h_applicable", "i_applicable",
                 "drop_atr", "min_z", "sweep", "overshoot_atr", "div1", "div2", "flip", "poc_pos", "third_pct", "pattern_vol_pct",
