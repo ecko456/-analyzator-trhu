@@ -60,6 +60,7 @@ namespace ReversalConfirmation.Atas
         private const string GLog = "8. Logování a kalibrace";
         private const string GView = "9. Zobrazení";
         private const string GAlerts = "10. Alerty";
+        private const string GRisk = "11. Řízení rizika";
 
         private readonly EngineSettings _s = new EngineSettings();
         private ReversalEngine _engine;
@@ -490,6 +491,30 @@ namespace ReversalConfirmation.Atas
 
         [Display(Name = "Barva targetů", GroupName = GView, Order = 160)]
         public Color TargetColor { get; set; } = Color.FromArgb(255, 30, 140, 220);
+
+        #endregion
+
+        #region Parameters: risk
+
+        [Display(Name = "Risk na obchod ($)", GroupName = GRisk, Order = 10, Description = "Z něj se v tooltipu (kroužek breaku, C, B, F) počítá počet kontraktů ES a MES pro vstup v F5 a F7.")]
+        [Range(0, 1000000)]
+        public decimal RiskPerTrade { get => (decimal)_s.RiskPerTradeUsd; set { _s.RiskPerTradeUsd = (double)value; RecalculateValues(); } }
+
+        [Display(Name = "Vstup: ticků před F5/F7", GroupName = GRisk, Order = 20, Description = "Limit stojí o tolik ticků před úrovní (u long nad ní), aby se vyplnil, i když cena úroveň jen těsně nedojede.")]
+        [Range(0, 20)]
+        public int FibEntryOffsetTicks { get => _s.FibEntryOffsetTicks; set { _s.FibEntryOffsetTicks = value; RecalculateValues(); } }
+
+        [Display(Name = "SL: ticků za bodem A", GroupName = GRisk, Order = 30)]
+        [Range(0, 50)]
+        public int FibStopTicks { get => _s.FibStopTicks; set { _s.FibStopTicks = value; RecalculateValues(); } }
+
+        [Display(Name = "Hodnota ticku ES ($)", GroupName = GRisk, Order = 40)]
+        [Range(0, 1000)]
+        public decimal TickValueEs { get => (decimal)_s.TickValueEs; set { _s.TickValueEs = (double)value; RecalculateValues(); } }
+
+        [Display(Name = "Hodnota ticku MES ($)", GroupName = GRisk, Order = 50)]
+        [Range(0, 1000)]
+        public decimal TickValueMes { get => (decimal)_s.TickValueMes; set { _s.TickValueMes = (double)value; RecalculateValues(); } }
 
         #endregion
 

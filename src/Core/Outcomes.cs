@@ -116,6 +116,12 @@ namespace ReversalConfirmation.Core
         public int[] Horizons;
         public int VBars;
         public Action<Tracker> OnDone;
+        /// <summary>
+        /// Fibo trade: target T1 = OP = C + this range (A→B), where C is the lowest low of the correction so far.
+        /// C deepens with every new low of the pullback, so OP adapts to the depth of the correction.
+        /// </summary>
+        public double AdaptiveRange = double.NaN;
+        private double _c = double.NaN;
 
         private int _k;
         private double _mfe, _mae;
@@ -135,6 +141,7 @@ namespace ReversalConfirmation.Core
         public void OnEntryBar(OBar b, int barIndex)
         {
             _mae = Math.Max(_mae, Entry - b.L);
+            if (!double.IsNaN(AdaptiveRange) && b.L > Stop) DeepenCorrection(b.L);
             if (b.L <= Stop)
             {
                 _stopHit = true;
@@ -173,6 +180,8 @@ namespace ReversalConfirmation.Core
 
             _mfe = Math.Max(_mfe, b.H - Entry);
             _mae = Math.Max(_mae, Entry - b.L);
+            // a deeper low moves OP down from the next bar on (the order of high and low inside this bar is unknown)
+            if (!double.IsNaN(AdaptiveRange) && !stopNow && !_resolved) DeepenCorrection(b.L);
 
             if (double.IsNaN(ResultR15))
             {
@@ -206,6 +215,13 @@ namespace ReversalConfirmation.Core
                 if (double.IsNaN(ResultR15)) ResultR15 = (b.C - Entry) / R;
                 Finish(true);
             }
+        }
+
+        private void DeepenCorrection(double low)
+        {
+            if (!double.IsNaN(_c) && low >= _c) return;
+            _c = low;
+            Targets[0] = _c + AdaptiveRange;
         }
 
         private void MarkZoneTargets(int barIndex, OBar b, bool stopNow)

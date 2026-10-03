@@ -245,7 +245,18 @@ namespace ReversalConfirmation.Core
         public double FibF7 = 0.789;
         /// <summary>Bars after the BOS within which the return must come.</summary>
         public int FibMaxBars = 36;
-        /// <summary>0 = a touch of F5/F7 counts as filled, 1 = price must trade one tick through (conservative).</summary>
+        /// <summary>The limit sits this many ticks before F5 / F7 (bullish above the level), so it fills even if price only just reaches it.</summary>
+        public int FibEntryOffsetTicks = 1;
+        /// <summary>Stop this many ticks beyond A (bullish below the low of A).</summary>
+        public int FibStopTicks = 1;
+
+        // ---------------- Risk ----------------
+        /// <summary>Money risked per trade; position size = risk / (stop ticks × tick value).</summary>
+        public double RiskPerTradeUsd = 100;
+        public double TickValueEs = 12.5;
+        public double TickValueMes = 1.25;
+
+        /// <summary>0 = reaching the limit counts as filled, 1 = price must trade one tick through it (conservative).</summary>
         public int FibFillThroughTicks = 0;
         /// <summary>
         /// The F mark needs a valid order-flow confirmation (C1/C2) first. Off by default: in the 2024–2026 back-test

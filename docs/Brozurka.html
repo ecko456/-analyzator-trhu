@@ -177,7 +177,7 @@
           <rect x="23" y="11" width="26" height="18" rx="2" class="c-bull"/>
           <text x="36" y="24" text-anchor="middle" class="t-white" font-size="12" font-weight="700" font-family="IBM Plex Sans, Arial, sans-serif">B</text>
         </svg>
-        <div><strong>Čtvereček B = break struktury (od 17:45)</strong><span>Od 17:45 našeho času se na svíčku C nečeká. Signálem je samotný break pivotu a order flow svíčky s breakem ho ohodnotí skórem 0–100. Tooltip ukáže, co svíčka splnila, a ceny F5/F7/SL/OP.</span></div>
+        <div><strong>Čtvereček B = break struktury (od 17:45)</strong><span>Od 17:45 našeho času se na svíčku C nečeká. Signálem je samotný break pivotu a order flow svíčky s breakem ho ohodnotí skórem 0–100. Tooltip ukáže, co svíčka splnila, a plán vstupu s počtem ES/MES.</span></div>
       </div>
       <div class="legend-row">
         <svg viewBox="0 0 72 40" role="img" aria-label="Zelený čtvereček s písmenem R">
@@ -191,7 +191,7 @@
           <rect x="23" y="11" width="26" height="18" rx="2" class="c-bull"/>
           <text x="36" y="24" text-anchor="middle" class="t-white" font-size="12" font-weight="700" {FONT}>F</text>
         </svg>
-        <div><strong>Čtvereček F = návrat do F5/F7</strong><span>Tvoje metoda: po breaku struktury se cena vrátila do 61,8 % (F5) impulsu A→B. Tooltip ukáže F5, F7, SL pod A a TP OP. Hloubka F7 (78,9 %) vycházela v datech lépe než F5.</span></div>
+        <div><strong>Čtvereček F = návrat do F5/F7</strong><span>Tvoje metoda: po breaku struktury se cena vrátila do 61,8 % (F5) impulsu A→B. Tooltip ukáže limit 1 tick před F5 a F7, SL 1 tick za A v ticích, kolik kontraktů ES a MES odpovídá tvému riziku a adaptivní OP. Hloubka F7 (78,9 %) vycházela v datech lépe než F5.</span></div>
       </div>
     </div>
     <p class="muted">Značky se objeví až po uzavření svíčky a už se neposunou. Mění se jen stav čtverečku C (prázdný se vyplní, nebo zešedne) a tečkovaná čára se prodlužuje, dokud setup žije. Signály hledá jen v okně, které obchoduješ (RTH nebo ETH, viz nastavení).</p>
@@ -442,7 +442,7 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
         <h3>Break struktury (BOS)</h3>
         <ul>
           <li>od low A jdu doleva a vezmu první svíčku, jejíž high vyčnívá nad svíčku nalevo (poslední nižší high)</li>
-          <li><strong>anomálie:</strong> svíčka A udělá nové low a zároveň high nad předchozí svíčkou (outside bar), pak se láme high svíčky A</li>
+          <li><strong>anomálie (outside bar):</strong> svíčka A přesáhne svíčku nalevo aspoň o 1 tick na obou stranách (nové low i high nad jejím high), pak se láme high svíčky A</li>
           <li>break = close nad touto úrovní (knot nestačí)</li>
         </ul>
         <p class="muted">Bearish zrcadlově: poslední vyšší low, anomálie = nové high a zároveň low pod předchozí svíčkou.</p>
@@ -472,8 +472,9 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
         <ul>
           <li>po breaku struktury reversalu (do 2 hodin od low A)</li>
           <li>impuls A→B: A = low reversalu, B = nejvyšší high od A</li>
-          <li>cena se do 3 hodin vrátí na F5 (61,8 %), B se tím zmrazí; F7 = 78,9 %</li>
-          <li>SL pod A, TP = OP (délka A→B od vstupu)</li>
+          <li>limit vždy 1 tick před F5 (61,8 %) nebo F7 (78,9 %); dosažením F5 se B zmrazí</li>
+          <li>SL 1 tick pod A; tooltip ukáže počet ticků SL a kolik kontraktů ES a MES odpovídá tvému riziku</li>
+          <li>TP = OP = C + délka A→B, kde C je nejnižší low korekce: OP se posouvá s hloubkou korekce</li>
         </ul>
         <p class="muted">Ve výchozím stavu F nečeká na C1, protože s order-flow potvrzením nevycházel lépe. Přepnout jde v nastavení.</p>
       </div>
@@ -496,6 +497,7 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
       </table>
     </div>
     <p class="muted">Čísla jsou průměrný výsledek na obchod v R (1 R = vzdálenost ke stopu) <strong>po odečtení nákladů</strong> 1,4 ticku na obchod (komise a 1 tick skluzu). Četnost v jednom okně: R asi 0,3× za den, F7 asi 0,3× za den, platné C1/C2 0,5–0,7× za den. Vzorky F7 jsou malé (v RTH testu 24 obchodů), takže rozdíly ±0,2 R jsou v rámci šumu. Platné C1 má smysl hlavně jako filtr: cena po něm dojde k původu pohybu (T1) v 62–79 % případů.</p>
+    <p class="muted"><strong>Vstup 1 tick před F5/F7, SL 1 tick za A, adaptivní OP</strong> (výstup na OP, net, starší / test): RTH F7 +0,11 / +0,09, F5 +0,06 / −0,02; ETH F7 +0,36 / +0,80, F5 +0,16 / +0,42. Těsnější stop o něco víc vybírá knoty, v RTH je proto F7 slabší než s větším bufferem, v ETH zůstává silné.</p>
     <p class="muted"><strong>Break režim po 17:45 (RTH):</strong> B přijde 0,6× za den (C dřív 0,4×), T1 60–66 %. Jako vstup trhem je kolem nuly (+0,01 / −0,01 R), stejně jako C, takže vstup dál patří do F7 nebo R. Order-flow skóre breaky řadí: 80+ → T1 73 %, 50–65 → 56 %.</p>
     <p class="muted"><strong>Profilové úrovně</strong> (dnešní, týdenní, minulý týden a nahé VAH/VAL/POC) přidají asi 10–17 % teček. Reversaly na nich ale v datech nedopadly lépe ani hůř než na ostatních úrovních: T1 podobně (RTH kolem 28 %, ETH kolem 35 %), stejná reakce ceny, výsledky R a F7 beze změny v rámci šumu. Volume i TPO profil vyšly stejně. Na nahých úrovních bylo za 2 roky jen 16–44 reversalů v okně, na závěr je to málo.</p>
     <p class="note">Minulost nezaručuje budoucnost. Dva roky jednoho trhu jsou solidní vzorek, ale ne jistota. Ber agenta jako druhý pár očí, ne jako automat.</p>
@@ -535,6 +537,8 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
           <tr><td>Value area z</td><td class="mono">volume profile</td><td>Market profile (TPO), pokud čteš trh přes TPO. V datech vyšly obě varianty stejně</td></tr>
           <tr><td>Váhy profilů: dnešní · týden · minulý týden · nahé</td><td class="mono">0,7 · 0,8 · 0,9 · 1,0</td><td>0 = profil vypnout. Nahé úrovně se drží max. 10 dní</td></tr>
           <tr><td>Ruční úrovně</td><td class="mono">prázdné</td><td>Tvoje vlastní ceny oddělené středníkem, např. <span class="mono">7750;7735,5</span></td></tr>
+          <tr><td>Risk na obchod ($)</td><td class="mono">100</td><td>Podle účtu. Z něj se počítá počet ES a MES u F5 a F7</td></tr>
+          <tr><td>Vstup ticků před F5/F7 · SL ticků za A</td><td class="mono">1 · 1</td><td>Podle toho, jak dáváš limit a stop</td></tr>
           <tr><td>Kalibrační JSON</td><td class="mono">podle okna</td><td>Prázdné = sám vezme <span class="mono">calibration_rth.json</span> nebo <span class="mono">calibration_eth.json</span> (instalace je nakopíruje)</td></tr>
         </tbody>
       </table>
@@ -562,7 +566,7 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
       <dt>BOS</dt><dd>Break of structure: close za posledním pivotem. Teprve tím se z obratu stává změna struktury.</dd>
       <dt>Anomálie</dt><dd>Svíčka A udělá nové low a zároveň high nad předchozí svíčkou (outside bar). Láme se pak rovnou high svíčky A.</dd>
       <dt>F5 / F7</dt><dd>Fibonacci návrat impulsu A→B: 61,8 % a 78,9 %.</dd>
-      <dt>OP</dt><dd>Cíl: délka impulsu A→B promítnutá od vstupu.</dd>
+      <dt>OP</dt><dd>Cíl: délka impulsu A→B promítnutá od C, nejnižšího bodu korekce (u short nejvyššího). S hlubší korekcí se posune.</dd>
       <dt>VWAP</dt><dd>Průměrná cena vážená objemem od začátku session.</dd>
       <dt>R</dt><dd>Jednotka rizika. 1 R = vzdálenost od vstupu ke stopu.</dd>
     </dl>

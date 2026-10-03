@@ -59,11 +59,13 @@ Výchozí zobrazení je minimalistické: agent jen označí svíčky, které nej
 | čtvereček **C1 / C2** | potvrzení: druhá strana převzala iniciativu (max 2 na reversal). **Prázdný** = čeká na break (max 30 min), **plný** = platné, **šedý** = break nepřišel |
 | čtvereček **B** | od 17:45 (nastavitelné): break struktury jako signál, bez čekání na C. Tooltip: order-flow skóre svíčky s breakem a F5/F7/SL/OP |
 | čtvereček **R** | retest: vyšší low (u bearish nižší high) blízko extrému se slabou deltou, v datech nejstabilnější místo pro vstup |
-| čtvereček **F** | návrat do F5 (61,8 %) impulsu A→B po breaku. Tooltip: F5, F7 (78,9 %), SL pod A, TP OP |
+| čtvereček **F** | návrat do F5 (61,8 %) impulsu A→B po breaku. Tooltip: plán vstupu (viz níže) |
 
 Najetí myší na značku zobrazí tooltip v češtině: skóre, naměřenou úspěšnost (s kalibrací pro dané okno), úroveň, variantu a všech devět podmínek A–I s ● (splněno) / ○ (ne) a konkrétními čísly. U C1/C2 je v tooltipu stav breaku struktury (kdy a kde přišel), cena VPOC svíčky a u platného potvrzení F5/F7/SL/OP pro limit.
 
 Volitelně (v sekci *9. Zobrazení*, ve výchozím stavu vypnuté): vstupní zóny, čáry stopu a targetů, značky × (kontext zrušen) a ! (absorpce selhala), statistický panel, referenční úrovně.
+
+**Plán vstupu a řízení rizika** (tooltip kroužku breaku, platného C1/C2, B a F): limit 1 tick před F5 a F7, SL 1 tick za bodem A, počet ticků SL, kolik kontraktů ES a MES odpovídá riziku na obchod (výchozí 100 $, skupina *11. Řízení rizika*) a OP = C + délka A→B pro C v F5 a v F7 (C = nejnižší low korekce, OP se s hloubkou korekce posouvá).
 
 Alerty (zvuk + popup): ve výchozím stavu platné C1/C2, C1/C2 čekající na break, retest R a F. Volitelně break struktury, reversal (standardně jen silné), zóny, fill, dotyk zóny, zrušení kontextu.
 
@@ -98,6 +100,7 @@ Alerty (zvuk + popup): ve výchozím stavu platné C1/C2, C1/C2 čekající na b
 | Logování | CSV · složka · kalibrace · kalibrované váhy | ano · `%APPDATA%\ATAS\ReversalConfirmation\logs` · podle okna `…\calibration_rth.json` / `_eth` · ne |
 | Zobrazení | tečka od skóre · C1/C2 · R · F · tečkovaně pivot · neplatná C šedě · tooltip | 60 · ano · ano · ano · ano · ano · ano |
 | | zóny · stop/targety · × · ! · panel · úrovně | ne |
+| Řízení rizika | risk na obchod · vstup před F5/F7 · SL za A · tick ES / MES | 100 $ · 1 t · 1 t · 12,50 $ / 1,25 $ |
 | Alerty | C1/C2 platné · čeká na break · R · F · break · reversal · zóny/fill/zrušení | ano · ano · ano · ano · ne · ne · ne |
 
 Všechny prahy jsou percentily, z-score (proti stejnému času dne za posledních 10 dní, s rolling fallbackem) nebo násobky ATR s minimem v ticích. Žádný práh není v kontraktech.
@@ -139,7 +142,7 @@ Replay zvládne ~140 000 svíček za ~10 s a ošetřuje kvartální rolly.
 ## Vývoj
 
 ```bash
-dotnet test tests/Core.Tests -c Release                                          # 39 testů
+dotnet test tests/Core.Tests -c Release                                          # 41 testů
 dotnet build src/Atas/ReversalConfirmation.Atas.csproj -c Release -p:AtasStubs=true  # kontrola kompilace bez ATAS
 dotnet build tools/AtasHarness -c Release -p:AtasStubs=true                        # simulace volání ATAS + měření výkonu
 ```

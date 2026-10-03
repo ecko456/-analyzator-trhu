@@ -588,15 +588,7 @@ namespace ReversalConfirmation.Core
             sb.Append('\n').Append(r.AboveRevHigh ? "● " : "○ ").Append(bull ? "close nad high reversalu" : "close pod low reversalu");
             if (r.Warning) sb.Append('\n').Append(bull ? "! POC nahoře a prodej nad POC (prodej do růstu)" : "! POC dole a nákup pod POC (nákup do poklesu)");
             sb.Append('\n').Append('\n').Append("VPOC svíčky: ").Append(F(ctx.Dir * ob.Poc, "0.##"));
-            double range = ctx.FibB - ctx.ExtremeO;
-            if (S.FiboEntry && range > 0)
-            {
-                double f5 = RoundTick(ctx.FibB - S.FibF5 * range), f7 = RoundTick(ctx.FibB - S.FibF7 * range);
-                sb.Append('\n').Append("Fibo A→B (B = ").Append(bull ? "high" : "low").Append(" k této svíčce): F5 ").Append(F(ctx.Dir * f5, "0.##"))
-                  .Append(" · F7 ").Append(F(ctx.Dir * f7, "0.##"));
-                sb.Append('\n').Append(bull ? "SL pod A: " : "SL nad A: ").Append(F(ctx.Dir * ctx.StopO, "0.##"))
-                  .Append(" · TP (OP od F7): ").Append(F(ctx.Dir * RoundTick(f7 + range), "0.##"));
-            }
+            AppendPlan(sb, ctx, Plan(ctx), bull ? ", B zatím: s dalším růstem se F5/F7 posunou výš" : ", B zatím: s dalším poklesem se F5/F7 posunou níž");
             return sb.ToString();
         }
 
@@ -606,25 +598,14 @@ namespace ReversalConfirmation.Core
             var sb = new StringBuilder();
             sb.Append("BREAK STRUKTURY (").Append(bull ? "bullish" : "bearish").Append(")  ")
               .Append(S.BosOnClose ? "close " : "cena ").Append(bull ? "nad " : "pod ").Append(F(ctx.Dir * ctx.BosO, "0.##"));
-            sb.Append('\n').Append(ctx.BosAnomaly ? (bull ? "Úroveň: high svíčky A (anomálie - nové LL a zároveň high nad předchozí svíčkou)" : "Úroveň: low svíčky A (anomálie - nové HH a zároveň low pod předchozí svíčkou)")
+            sb.Append('\n').Append(ctx.BosAnomaly ? (bull ? "Úroveň: high svíčky A (anomálie: outside bar, nové LL a high min. o 1 tick nad předchozí svíčkou)" : "Úroveň: low svíčky A (anomálie: outside bar, nové HH a low min. o 1 tick pod předchozí svíčkou)")
                                                   : (bull ? "Úroveň: pivot high (první svíčka vlevo od A, jejíž high vyčnívá nad svíčku nalevo)" : "Úroveň: pivot low (první svíčka vlevo od A, jejíž low vyčnívá pod svíčku nalevo)"));
             sb.Append('\n').Append(bull ? "A (low reversalu): " : "A (high reversalu): ").Append(F(ctx.Dir * ctx.ExtremeO, "0.##"))
               .Append(", break o ").Append(t - ctx.Cand.ExtremeBar).Append(" sv. později");
-            double range = ctx.FibB - ctx.ExtremeO;
-            if (S.FiboEntry && range > 0)
-            {
-                double f5 = RoundTick(ctx.FibB - S.FibF5 * range), f7 = RoundTick(ctx.FibB - S.FibF7 * range);
-                sb.Append('\n');
-                sb.Append('\n').Append("Impuls A→B zatím: B ").Append(F(ctx.Dir * ctx.FibB, "0.##")).Append(" (").Append(F(range / Tick, "0")).Append(" t)");
-                sb.Append('\n').Append("F5 (61,8 %): ").Append(F(ctx.Dir * f5, "0.##")).Append("   F7 (78,9 %): ").Append(F(ctx.Dir * f7, "0.##"));
-                sb.Append('\n').Append(bull ? "SL pod A: " : "SL nad A: ").Append(F(ctx.Dir * ctx.StopO, "0.##"));
-                sb.Append('\n').Append("TP (OP = A→B od vstupu): od F5 ").Append(F(ctx.Dir * RoundTick(f5 + range), "0.##"))
-                  .Append(" · od F7 ").Append(F(ctx.Dir * RoundTick(f7 + range), "0.##"));
-                sb.Append('\n').Append(bull ? "Když cena ještě poroste, B a s ním F5/F7 se posunou výš." : "Když cena ještě klesne, B a s ním F5/F7 se posunou níž.");
-            }
             sb.Append('\n').Append(ctx.ValidConfirmations > 0 || ctx.Pending != null
                 ? "● order flow potvrdil (" + (ctx.Pending?.Label ?? "C" + ctx.ValidConfirmations) + "), potvrzení je tímto breakem platné"
                 : "○ order flow zatím nepotvrdil (C1)");
+            AppendPlan(sb, ctx, Plan(ctx), bull ? ", B zatím: s dalším růstem se F5/F7 posunou výš" : ", B zatím: s dalším poklesem se F5/F7 posunou níž");
             return sb.ToString();
         }
 
@@ -636,20 +617,21 @@ namespace ReversalConfirmation.Core
         private void UpdateFibo(Context ctx, int t, OBar ob)
         {
             if (ctx.FibF7Done || ctx.FibExpired) return;
-            double a = ctx.ExtremeO, b = ctx.FibB, range = b - a;
             if (!ctx.FibF5Done && t - ctx.BosBar > S.FibMaxBars) { ctx.FibExpired = true; return; }
-            if (range > 0)
+            var plan = Plan(ctx);
+            if (plan.Valid)
             {
-                double f5 = RoundTick(b - S.FibF5 * range), f7 = RoundTick(b - S.FibF7 * range), through = S.FibFillThroughTicks * Tick;
-                if (!ctx.FibF5Done && ob.L <= f5 - through + 1e-9)
+                // the limit sits one tick before the level; conservative mode needs price to trade through it
+                double through = S.FibFillThroughTicks * Tick;
+                if (!ctx.FibF5Done && ob.L <= plan.E5 - through + 1e-9)
                 {
                     ctx.FibF5Done = true;
-                    FiboTrade(ctx, t, ob, Math.Min(f5, ob.O), "F5", f5, f7);
+                    FiboTrade(ctx, t, ob, Math.Min(plan.E5, ob.O), "F5", plan);
                 }
-                if (ctx.FibF5Done && !ctx.FibF7Done && ob.L <= f7 - through + 1e-9)
+                if (ctx.FibF5Done && !ctx.FibF7Done && ob.L <= plan.E7 - through + 1e-9)
                 {
                     ctx.FibF7Done = true;
-                    FiboTrade(ctx, t, ob, Math.Min(f7, ob.O), "F7", f5, f7);
+                    FiboTrade(ctx, t, ob, Math.Min(plan.E7, ob.O), "F7", plan);
                 }
                 if (ctx.FibF5Done) return;   // B is frozen once the pullback reached the zone
             }
@@ -658,11 +640,59 @@ namespace ReversalConfirmation.Core
 
         private double RoundTick(double p) => Math.Round(p / Tick) * Tick;
 
-        private void FiboTrade(Context ctx, int t, OBar ob, double entry, string level, double f5, double f7)
+        /// <summary>Trader's entry plan for the impulse A→B (oriented prices): F5 / F7, limits one tick before them, stop one tick beyond A.</summary>
+        private struct FibPlan
+        {
+            public double F5, F7, E5, E7, Stop, Range;
+            public bool Valid;
+        }
+
+        private FibPlan Plan(Context ctx)
         {
             double range = ctx.FibB - ctx.ExtremeO;
-            double op = RoundTick(entry + range);
-            double r = entry - ctx.StopO;
+            if (!S.FiboEntry || double.IsNaN(range) || range <= 0) return default;
+            double f5 = RoundTick(ctx.FibB - S.FibF5 * range), f7 = RoundTick(ctx.FibB - S.FibF7 * range), off = S.FibEntryOffsetTicks * Tick;
+            return new FibPlan
+            {
+                F5 = f5, F7 = f7, E5 = f5 + off, E7 = f7 + off, Stop = ctx.ExtremeO - S.FibStopTicks * Tick, Range = range, Valid = true
+            };
+        }
+
+        private int Contracts(double stopTicks, double tickValue) =>
+            stopTicks > 0 && tickValue > 0 ? (int)Math.Floor(S.RiskPerTradeUsd / (stopTicks * tickValue) + 1e-9) : 0;
+
+        /// <summary>Entry, stop in ticks and position size for F5 and F7, and the adaptive OP.</summary>
+        private void AppendPlan(StringBuilder sb, Context ctx, FibPlan p, string bNote)
+        {
+            if (!p.Valid) return;
+            bool bull = ctx.Dir > 0;
+            sb.Append('\n').Append('\n').Append("PLÁN VSTUPU  A ").Append(F(ctx.Dir * ctx.ExtremeO, "0.##")).Append(" → B ").Append(F(ctx.Dir * ctx.FibB, "0.##"))
+              .Append(" (").Append(F(p.Range / Tick, "0")).Append(" t)").Append(bNote);
+            sb.Append('\n').Append("SL ").Append(S.FibStopTicks).Append(" t ").Append(bull ? "pod A: " : "nad A: ").Append(F(ctx.Dir * p.Stop, "0.##"))
+              .Append("   risk ").Append(F(S.RiskPerTradeUsd, "0")).Append(" $ na obchod");
+            void Level(string name, double level, double entry)
+            {
+                double ticks = Math.Round((entry - p.Stop) / Tick);
+                int es = Contracts(ticks, S.TickValueEs), mes = Contracts(ticks, S.TickValueMes);
+                sb.Append('\n').Append(name).Append(' ').Append(F(ctx.Dir * level, "0.##"))
+                  .Append(" → limit ").Append(F(ctx.Dir * entry, "0.##"))
+                  .Append(" · SL ").Append(F(ticks, "0")).Append(" t")
+                  .Append(" · ES ").Append(es).Append(" · MES ").Append(mes);
+                if (es == 0) sb.Append("  (1 ES = ").Append(F(ticks * S.TickValueEs, "0")).Append(" $)");
+            }
+            Level("F5", p.F5, p.E5);
+            Level("F7", p.F7, p.E7);
+            sb.Append('\n').Append("TP = OP = C + A→B: C v F5 → ").Append(F(ctx.Dir * RoundTick(p.F5 + p.Range), "0.##"))
+              .Append(" · C v F7 → ").Append(F(ctx.Dir * RoundTick(p.F7 + p.Range), "0.##"));
+            sb.Append('\n').Append("   C = ").Append(bull ? "nejnižší low" : "nejvyšší high").Append(" korekce: čím hlubší korekce, tím ").Append(bull ? "níž" : "výš").Append(" OP");
+        }
+
+        private void FiboTrade(Context ctx, int t, OBar ob, double entry, string level, FibPlan plan)
+        {
+            double range = plan.Range;
+            double levelPrice = level == "F5" ? plan.F5 : plan.F7;
+            double op = RoundTick(levelPrice + range);
+            double r = entry - plan.Stop;
             if (r <= 0) return;
             bool bull = ctx.Dir > 0;
             bool show = !S.FiboRequireConf || ctx.ValidConfirmations > 0;
@@ -672,12 +702,14 @@ namespace ReversalConfirmation.Core
                 {
                     Bar = t, Dir = ctx.Dir, Type = MarkType.FiboEntry, Label = "F",
                     Price = bull ? _bars[t].Low : _bars[t].High, ContextId = ctx.Id, Score = ctx.Score,
-                    Tooltip = FiboTooltip(ctx, t, f5, f7, op)
+                    Tooltip = FiboTooltip(ctx, t, plan)
                 });
+                double ticks = Math.Round((plan.E5 - plan.Stop) / Tick);
                 Events.Add(new EngineEvent
                 {
-                    Type = EngineEventType.FiboEntry, Bar = t, Dir = ctx.Dir, Price = ctx.Dir * f5, Score = ctx.Score,
-                    Text = $"Návrat do F5/F7 po breaku struktury ({(bull ? "long" : "short")}), F5 {F(ctx.Dir * f5, "0.##")}, F7 {F(ctx.Dir * f7, "0.##")}"
+                    Type = EngineEventType.FiboEntry, Bar = t, Dir = ctx.Dir, Price = ctx.Dir * plan.F5, Score = ctx.Score,
+                    Text = $"Návrat do F5 ({(bull ? "long" : "short")}): limit {F(ctx.Dir * plan.E5, "0.##")}, SL {F(ctx.Dir * plan.Stop, "0.##")} ({F(ticks, "0")} t), " +
+                           $"ES {Contracts(ticks, S.TickValueEs)} / MES {Contracts(ticks, S.TickValueMes)}; F7 limit {F(ctx.Dir * plan.E7, "0.##")}"
                 });
             }
 
@@ -689,15 +721,15 @@ namespace ReversalConfirmation.Core
                .Set("bos_dist_atr", (ctx.BosO - ctx.ExtremeO) / ctx.Atr)
                .Set("fib_level", level).Set("fib_a", ctx.Dir * ctx.ExtremeO).Set("fib_b", ctx.Dir * ctx.FibB)
                .Set("fib_range_atr", range / ctx.Atr).Set("fib_bars", t - ctx.BosBar)
-               .Set("entry", ctx.Dir * entry).Set("stop", ctx.Dir * ctx.StopO).Set("r_ticks", r / Tick)
+               .Set("entry", ctx.Dir * entry).Set("stop", ctx.Dir * plan.Stop).Set("r_ticks", r / Tick)
                .Set("t1", ctx.Dir * op).Set("t_first", ctx.Dir * op).Set("rr_first", (op - entry) / r);
             var st = _stats[t];
             row.Set("with_trend", !double.IsNaN(st.VwapSlope) && ctx.Dir * st.VwapSlope > 0);
             var tr = new Tracker
             {
-                Row = row, Dir = ctx.Dir, Kind = "FIB", EntryBar = t, Entry = entry, Stop = ctx.StopO, R = r, Tick = Tick,
+                Row = row, Dir = ctx.Dir, Kind = "FIB", EntryBar = t, Entry = entry, Stop = plan.Stop, R = r, Tick = Tick,
                 TolTarget = Math.Max(S.TargetTolTicks * Tick, S.TargetTolAtr * ctx.Atr),
-                Horizons = S.Horizons, VBars = S.VReversalBars, Primary = 0
+                Horizons = S.Horizons, VBars = S.VReversalBars, Primary = 0, AdaptiveRange = range
             };
             tr.Targets[0] = op;
             tr.Targets[1] = tr.Targets[2] = double.NaN;
@@ -708,22 +740,15 @@ namespace ReversalConfirmation.Core
             _trackers.Add(tr);
         }
 
-        private string FiboTooltip(Context ctx, int t, double f5, double f7, double op)
+        private string FiboTooltip(Context ctx, int t, FibPlan plan)
         {
             bool bull = ctx.Dir > 0;
             var sb = new StringBuilder();
-            sb.Append("F  NÁVRAT DO FIBO F5/F7 po breaku struktury (").Append(bull ? "long" : "short").Append(')');
-            sb.Append('\n').Append("Impuls A→B: A ").Append(F(ctx.Dir * ctx.ExtremeO, "0.##")).Append(" → B ").Append(F(ctx.Dir * ctx.FibB, "0.##"))
-              .Append(" (").Append(F((ctx.FibB - ctx.ExtremeO) / Tick, "0")).Append(" t)");
-            sb.Append('\n').Append("BOS: ").Append(F(ctx.Dir * ctx.BosO, "0.##")).Append(ctx.BosAnomaly ? " (anomálie, svíčka A)" : " (pivot)")
+            sb.Append("F  NÁVRAT DO F5 po breaku struktury (").Append(bull ? "long" : "short").Append(')');
+            sb.Append('\n').Append("BOS: ").Append(F(ctx.Dir * ctx.BosO, "0.##")).Append(ctx.BosAnomaly ? " (anomálie, outside bar A)" : " (pivot)")
               .Append(", před ").Append(t - ctx.BosBar).Append(" sv.");
-            sb.Append('\n');
-            sb.Append('\n').Append("F5 (61,8 %): ").Append(F(ctx.Dir * f5, "0.##"));
-            sb.Append('\n').Append("F7 (78,9 %): ").Append(F(ctx.Dir * f7, "0.##"));
-            sb.Append('\n').Append(bull ? "SL pod A: " : "SL nad A: ").Append(F(ctx.Dir * ctx.StopO, "0.##"));
-            sb.Append('\n').Append("TP (OP, 100 % A→B od F5): ").Append(F(ctx.Dir * op, "0.##"))
-              .Append(" · od F7: ").Append(F(ctx.Dir * RoundTick(f7 + (ctx.FibB - ctx.ExtremeO)), "0.##"));
             sb.Append('\n').Append(ctx.ValidConfirmations > 0 ? $"● platné order-flow potvrzení (C{ctx.ValidConfirmations})" : "○ bez platného order-flow potvrzení (C1)");
+            AppendPlan(sb, ctx, plan, ", B konečné");
             sb.Append('\n').Append("V backtestu 2024–2026 vycházel vstup v F7 lépe než v F5.");
             return sb.ToString();
         }
@@ -1300,15 +1325,7 @@ namespace ReversalConfirmation.Core
             sb.Append('\n').Append(conf.AboveRevHigh ? "● " : "○ ").Append(bull ? "close nad high reversalu" : "close pod low reversalu");
             if (conf.Warning) sb.Append('\n').Append(bull ? "! POC nahoře a prodej nad POC (prodej do růstu)" : "! POC dole a nákup pod POC (nákup do poklesu)");
             sb.Append('\n').Append('\n').Append("VPOC svíčky (úroveň pro limit): ").Append(F(ctx.Dir * ob.Poc, "0.##"));
-            if (validBar >= 0 && S.FiboEntry && !double.IsNaN(ctx.FibB) && ctx.FibB > ctx.ExtremeO)
-            {
-                double range = ctx.FibB - ctx.ExtremeO;
-                double f5 = RoundTick(ctx.FibB - S.FibF5 * range), f7 = RoundTick(ctx.FibB - S.FibF7 * range);
-                sb.Append('\n').Append("Fibo A→B (B = ").Append(bull ? "high" : "low").Append(" k této svíčce): F5 ").Append(F(ctx.Dir * f5, "0.##"))
-                  .Append(" · F7 ").Append(F(ctx.Dir * f7, "0.##"));
-                sb.Append('\n').Append(bull ? "SL pod A: " : "SL nad A: ").Append(F(ctx.Dir * ctx.StopO, "0.##"))
-                  .Append(" · TP (OP od F5): ").Append(F(ctx.Dir * RoundTick(f5 + range), "0.##"));
-            }
+            if (validBar >= 0) AppendPlan(sb, ctx, Plan(ctx), bull ? ", B zatím: s dalším růstem se F5/F7 posunou výš" : ", B zatím: s dalším poklesem se F5/F7 posunou níž");
             return sb.ToString();
         }
 

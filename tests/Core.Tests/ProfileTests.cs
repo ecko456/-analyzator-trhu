@@ -133,3 +133,32 @@ namespace ReversalConfirmation.Tests
         }
     }
 }
+
+namespace ReversalConfirmation.Tests
+{
+    public class FiboTradeTests
+    {
+        private static OBar B(int i, double o, double h, double l, double c) =>
+            Bar.Create(i, new DateTime(2026, 2, 4, 15, 0, 0, DateTimeKind.Utc).AddMinutes(5 * i), o, h, l, c, 0.25,
+                new[] { l, h }, new[] { 10.0, 10.0 }, new[] { 10.0, 10.0 }, 2).Oriented(1);
+
+        [Fact]
+        public void Op_FollowsTheDepthOfTheCorrection()
+        {
+            var row = new LogRow();
+            var tr = new Tracker
+            {
+                Row = row, Dir = 1, Kind = "FIB", EntryBar = 0, Entry = 100, Stop = 90, R = 10, Tick = 0.25, TolTarget = 0.5,
+                Horizons = new[] { 3, 6, 12, 24, 36 }, VBars = 6, Primary = 0, AdaptiveRange = 20
+            };
+            tr.Targets[0] = 120; tr.Targets[1] = tr.Targets[2] = double.NaN; tr.Targets[3] = 115; tr.Targets[4] = 120;
+            tr.OnEntryBar(B(0, 101, 101, 98, 99), 0);      // C = 98 -> OP 118
+            Assert.Equal(118, tr.Targets[0]);
+            tr.Update(B(1, 99, 99.5, 95, 96), 1, 50);       // deeper correction: C = 95 -> OP 115
+            Assert.Equal(115, tr.Targets[0]);
+            tr.Update(B(2, 96, 115.25, 96, 115), 2, 50);    // reaches the adapted OP
+            Assert.True(tr.PrimaryHit);
+            Assert.Equal(1.5, tr.ResultR, 6);
+        }
+    }
+}

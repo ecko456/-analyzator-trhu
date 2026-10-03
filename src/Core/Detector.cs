@@ -222,7 +222,9 @@ namespace ReversalConfirmation.Core
         {
             anomaly = false;
             var a = O(extremeBar, dir);
-            if (_bars.Has(extremeBar - 1) && a.H > O(extremeBar - 1, dir).H)
+            // anomaly = outside bar: candle A exceeds the candle to its left by at least one tick on both sides
+            // (new low and a high above that candle's high); its own high is then the level to break
+            if (_bars.Has(extremeBar - 1) && a.H >= O(extremeBar - 1, dir).H + _tick - 1e-9 && a.L <= O(extremeBar - 1, dir).L - _tick + 1e-9)
             {
                 anomaly = true;
                 pivotBar = extremeBar;

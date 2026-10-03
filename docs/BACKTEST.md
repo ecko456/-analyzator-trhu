@@ -64,6 +64,19 @@ python calibration/calibrate.py runs/rth/log.csv --window rth --out calibration/
 python calibration/calibrate.py runs/eth/log.csv --window eth --out calibration/es_m5_eth.json
 ```
 
+## Vstup 1 tick před F5/F7, SL 1 tick za A, adaptivní OP
+
+Plán obchodníka: limit vždy 1 tick před F5 / F7 (fill, jakmile cena limit dosáhne; konzervativně musí projít o tick), SL 1 tick za bodem A, cíl OP = C + délka A→B, kde C je nejnižší low korekce (u short nejvyšší high). C se prohlubuje s každým novým low korekce a OP se od další svíčky posune (pořadí high/low uvnitř svíčky neznáme).
+
+| net po nákladech | výstup | RTH trénink | RTH test | ETH trénink | ETH test |
+|---|---|---:|---:|---:|---:|
+| F7 | OP | +0,11 ± 0,18 (117) | +0,09 ± 0,28 (55) | +0,36 ± 0,18 (120) | +0,80 ± 0,29 (61) |
+| F7 | 1,5 R | +0,07 | +0,27 | +0,15 | +0,48 |
+| F5 | OP | +0,06 ± 0,11 (173) | −0,02 ± 0,16 (79) | +0,16 ± 0,11 (173) | +0,42 ± 0,15 (95) |
+| F7, fill proobchodováním | OP | +0,12 | +0,11 | +0,31 | +0,48 |
+
+OP zasažen: F7 22–24 % (RTH) a 35–43 % (ETH) při mediánu RR 3,6–4,2; F5 31–32 % a 42–48 % při RR 2,2–2,4. Medián SL: F7 18–21 t (RTH) a 9–12 t (ETH), F5 31–35 t a 16–20 t. S původním stopem (max(2 t, 0,05 ATR) pod A) a pevným OP byl RTH F7 o něco lepší (+0,29 / +0,13 na OP), ETH podobné; těsnější stop víc vybírá knoty. Tooltip počítá kontrakty jako ⌊risk / (ticky SL × hodnota ticku)⌋, výchozí risk 100 $, ES 12,50 $ a MES 1,25 $ za tick.
+
 ## Break režim od 17:45 (RTH)
 
 Od 17:45 pražského času se nečeká na order-flow svíčku C: signálem je samotný break struktury (čtvereček B), statistika vstupuje na close svíčky s breakem a order flow této svíčky dává skóre 0–100 (stejné složky jako u C, nesplněné podmínky C se odečtou: delta −15, close location −10, efektivita −10, close pod předchozí −5).

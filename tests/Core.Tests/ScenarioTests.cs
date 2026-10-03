@@ -23,9 +23,9 @@ namespace ReversalConfirmation.Tests
         }
 
         /// <summary>Initiative sell-off into a level, flush below it, reclaim (2-bar), confirmation, pullback fill, rally.</summary>
-        /// <param name="anomaly">true: the reclaim bar's high is above the flush bar's high (outside bar), so the BOS level
+        /// <param name="anomaly">true: the reclaim bar is an outside bar of the flush bar (new low and higher high), so the BOS level
         /// is that high and C1 breaks it; false: the BOS level is the last lower high (p + 3) far above C1.</param>
-        private static Scenario FlushReclaim(Action<Synthetic, double> afterReclaim = null, bool reclaim = true, bool anomaly = true)
+        private static Scenario FlushReclaim(Action<Synthetic, double> afterReclaim = null, bool reclaim = true, bool anomaly = true, bool equalLow = false)
         {
             var s = new Synthetic(7, SessionStart, 5000);
             while (s.Time < PatternTime) s.Noise(1);
@@ -38,7 +38,8 @@ namespace ReversalConfirmation.Tests
             s.Add(p - 1.25, p - 1, p - 3.5, p - 3.25, 2500, -700, 0.3);
             s.Add(p - 3.25, p - 3, p - 5.5, p - 5.25, 2500, -600, 0.3);
             s.Add(p - 5.25, p - 5, p - 6.75, p - 6.5, 4000, -1600, 0.15);       // flush through the level, close below
-            var rev = s.Add(p - 6.5, anomaly ? p - 4.75 : p - 5.0, p - 6.75, reclaim ? p - 5.0 : p - 6.25, 3000, 700, 0.2); // reclaim
+            // anomaly: an outside bar, one tick beyond the flush bar on both sides
+            var rev = s.Add(p - 6.5, anomaly ? p - 4.75 : p - 5.0, anomaly && !equalLow ? p - 7.0 : p - 6.75, reclaim ? p - 5.0 : p - 6.25, 3000, 700, 0.2); // reclaim
             sc.RevBar = rev.Index;
             if (afterReclaim != null)
             {
@@ -91,6 +92,12 @@ namespace ReversalConfirmation.Tests
             Assert.Equal(sc.PivotBar, line.PivotBar);
             Assert.Equal(sc.P + 3, line.Price, 6);
             Assert.False(line.Anomaly);
+            // ring tooltip: limit one tick before F5/F7, stop one tick below A, size for ES and MES
+            var ring = e.Marks.Single(m => m.Type == MarkType.StructureBreak && m.ContextId == rev.ContextId);
+            Assert.Contains("PLÁN VSTUPU", ring.Tooltip);
+            Assert.Contains("SL 1 t pod A", ring.Tooltip);
+            Assert.Contains("MES", ring.Tooltip);
+            Assert.Contains("C v F7", ring.Tooltip);
 
             // order flow on the C1 candle, the close above the pivot comes 5 bars later (25 min < 30 min)
             int breakBar = sc.ConfBar + 5;
@@ -134,6 +141,20 @@ namespace ReversalConfirmation.Tests
             Assert.Contains(e.Events, ev => ev.Type == EngineEventType.Confirmation && ev.Bar == breakBar && ev.Text.StartsWith("B break"));
             Assert.DoesNotContain(e.Events, ev => ev.Type == EngineEventType.ConfirmationPending);
             Assert.Contains(sink.Rows, r => r.Get("kind") == "BRK" && r.Get("bar") == breakBar.ToString());
+        }
+
+        [Fact]
+        public void OutsideBar_NeedsATickBeyondBothSides_ToBeTheAnomaly()
+        {
+            foreach (var (equalLow, expected) in new[] { (false, true), (true, false) })
+            {
+                var sc = FlushReclaim((s, p) => s.Noise(30), equalLow: equalLow);
+                var e = Run(sc.S.Bars, Settings(sc, onlyManual: true));
+                var rev = e.Marks.Single(m => m.Type == MarkType.Reversal && m.Bar == sc.RevBar);
+                var line = e.Structures.Single(l => l.ContextId == rev.ContextId);
+                Assert.Equal(expected, line.Anomaly);
+                if (expected) Assert.Equal(sc.P - 4.75, line.Price, 6);   // high of the outside bar A
+            }
         }
 
         [Fact]
@@ -236,7 +257,7 @@ namespace ReversalConfirmation.Tests
             var sc = FlushReclaim((s, p) =>
             {
                 s.Add(p - 5.0, p - 2.75, p - 5.25, p - 3.0, 3000, 300, 0.4);   // C1
-                s.Add(p - 3.0, p - 2.75, p - 6.5, p - 5.75, 1500, -150, 0.5);  // retest: higher low, quiet
+                s.Add(p - 3.0, p - 2.75, p - 6.75, p - 5.75, 1500, -150, 0.5); // retest: higher low (A = p - 7), quiet
                 s.Add(p - 5.75, p - 2.0, p - 6.0, p - 2.25, 3500, 450, 0.4);   // C2 after the retest
                 for (int i = 0; i < 5; i++)
                 {
