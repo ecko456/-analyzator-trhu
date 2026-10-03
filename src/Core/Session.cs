@@ -18,6 +18,8 @@ namespace ReversalConfirmation.Core
         /// <summary>Bar starts inside the selected trading window.</summary>
         public bool InWindow;
         public string WindowCode => InRthWindow ? "rth" : InEthWindow ? "eth" : "";
+        /// <summary>Time of day on the trader's clock (EngineSettings.LocalTimeZoneId).</summary>
+        public TimeSpan LocalTod;
     }
 
     /// <summary>DST-correct session calendar in the exchange's reference time zone (ET for CME equity futures).</summary>
@@ -104,6 +106,7 @@ namespace ReversalConfirmation.Core
             bt.InRthWindow = InRange(tod, Norm(_rthFrom), Norm(_rthTo));
             var ltod = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcOpen, DateTimeKind.Utc), _localTz).TimeOfDay;
             bt.InEthWindow = InRange(ltod, _s.EthWindowFrom, _s.EthWindowTo);
+            bt.LocalTod = ltod;
             bt.InWindow = _s.Window == TradeWindow.All || (_s.Window == TradeWindow.Rth ? bt.InRthWindow : bt.InEthWindow);
 
             if (_news.Count > 0)

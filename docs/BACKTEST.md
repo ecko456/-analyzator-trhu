@@ -64,6 +64,19 @@ python calibration/calibrate.py runs/rth/log.csv --window rth --out calibration/
 python calibration/calibrate.py runs/eth/log.csv --window eth --out calibration/es_m5_eth.json
 ```
 
+## Break režim od 17:45 (RTH)
+
+Od 17:45 pražského času se nečeká na order-flow svíčku C: signálem je samotný break struktury (čtvereček B), statistika vstupuje na close svíčky s breakem a order flow této svíčky dává skóre 0–100 (stejné složky jako u C, nesplněné podmínky C se odečtou: delta −15, close location −10, efektivita −10, close pod předchozí −5).
+
+| RTH po 17:45, net 1,5 R | trénink | test |
+|---|---:|---:|
+| B (break), trhem | +0,01 ± 0,07 (200; 0,62/den; T1 60 %) | −0,01 ± 0,10 (112; 0,61/den; T1 66 %) |
+| C platné (původní režim), trhem | −0,03 ± 0,09 (137; 0,43/den; T1 65 %) | −0,12 ± 0,12 (73; 0,40/den; T1 64 %) |
+| F7 po breaku | +0,17 ± 0,13 (90) | +0,44 ± 0,18 (43) |
+| R (retest) | +0,01 ± 0,15 (67) | +0,57 ± 0,20 (36) |
+
+B podle order-flow skóre (oba roky): <50 T1 57 % (28), 50–65 56 % (94), 65–80 64 % (100), 80+ **73 %** (90). Skóre tedy řadí breaky podle šance dojít k originu pohybu; výsledek vstupu trhem na 1,5 R se ale nemění (stop pod A je po breaku daleko). F7 a R režim neovlivní (stejné kontexty).
+
 ## Market a volume profile úrovně
 
 Nové referenční úrovně (výchozí váha): **dnešní developing VAH/VAL/POC** (0,7; v RTH z RTH profilu, před open z Globex session, až po 60 minutách profilu), **VAH/VAL/POC tohoto týdne** (0,8; developing, všechny obchody týdne, od druhé session), **předchozího týdne** (0,9) a **nahé VAH/VAL/POC** (1,0; z posledních 10 dní, na kterých cena od uzavření jejich profilu neobchodovala, po prvním dotyku zmizí). Value area 70 % z objemu (VP), nebo volitelně z TPO (MP, 30min periody). Úrovně vstupují do komponenty B (výběr úrovně, blízkost, konfluence) jako všechny ostatní.

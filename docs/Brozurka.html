@@ -173,6 +173,13 @@
         <div><strong>Čtvereček C1 / C2 = potvrzení</strong><span>Po tečce přišla svíčka, ve které nová strana převzala iniciativu. <em>Prázdný</em>: order flow potvrdil, ale struktura ještě není prolomená, takže se čeká na break (max 30 minut). <em>Plný</em>: break přišel a potvrzení platí. <em>Šedý</em>: break nepřišel včas. Na jeden reversal nejvýš dvě potvrzení.</span></div>
       </div>
       <div class="legend-row">
+        <svg viewBox="0 0 72 40" role="img" aria-label="Zelený čtvereček s písmenem B">
+          <rect x="23" y="11" width="26" height="18" rx="2" class="c-bull"/>
+          <text x="36" y="24" text-anchor="middle" class="t-white" font-size="12" font-weight="700" font-family="IBM Plex Sans, Arial, sans-serif">B</text>
+        </svg>
+        <div><strong>Čtvereček B = break struktury (od 17:45)</strong><span>Od 17:45 našeho času se na svíčku C nečeká. Signálem je samotný break pivotu a order flow svíčky s breakem ho ohodnotí skórem 0–100. Tooltip ukáže, co svíčka splnila, a ceny F5/F7/SL/OP.</span></div>
+      </div>
+      <div class="legend-row">
         <svg viewBox="0 0 72 40" role="img" aria-label="Zelený čtvereček s písmenem R">
           <rect x="23" y="11" width="26" height="18" rx="2" class="c-bull"/>
           <text x="36" y="24" text-anchor="middle" class="t-white" font-size="12" font-weight="700" font-family="IBM Plex Sans, Arial, sans-serif">R</text>
@@ -489,6 +496,7 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
       </table>
     </div>
     <p class="muted">Čísla jsou průměrný výsledek na obchod v R (1 R = vzdálenost ke stopu) <strong>po odečtení nákladů</strong> 1,4 ticku na obchod (komise a 1 tick skluzu). Četnost v jednom okně: R asi 0,3× za den, F7 asi 0,3× za den, platné C1/C2 0,5–0,7× za den. Vzorky F7 jsou malé (v RTH testu 24 obchodů), takže rozdíly ±0,2 R jsou v rámci šumu. Platné C1 má smysl hlavně jako filtr: cena po něm dojde k původu pohybu (T1) v 62–79 % případů.</p>
+    <p class="muted"><strong>Break režim po 17:45 (RTH):</strong> B přijde 0,6× za den (C dřív 0,4×), T1 60–66 %. Jako vstup trhem je kolem nuly (+0,01 / −0,01 R), stejně jako C, takže vstup dál patří do F7 nebo R. Order-flow skóre breaky řadí: 80+ → T1 73 %, 50–65 → 56 %.</p>
     <p class="muted"><strong>Profilové úrovně</strong> (dnešní, týdenní, minulý týden a nahé VAH/VAL/POC) přidají asi 10–17 % teček. Reversaly na nich ale v datech nedopadly lépe ani hůř než na ostatních úrovních: T1 podobně (RTH kolem 28 %, ETH kolem 35 %), stejná reakce ceny, výsledky R a F7 beze změny v rámci šumu. Volume i TPO profil vyšly stejně. Na nahých úrovních bylo za 2 roky jen 16–44 reversalů v okně, na závěr je to málo.</p>
     <p class="note">Minulost nezaručuje budoucnost. Dva roky jednoho trhu jsou solidní vzorek, ale ne jistota. Ber agenta jako druhý pár očí, ne jako automat.</p>
   </section>
@@ -499,7 +507,8 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
       <li><div><strong>Přepni okno.</strong> V nastavení <em>Obchoduji</em> vyber RTH nebo ETH. Indikátor pak hledá signály jen v tvém okně a bere kalibraci jen z něj.</div></li>
       <li><div><strong>Tečka + tečkovaná čára = něco se tvoří.</strong> Čára ukazuje pivot, který musí padnout. Najeď na tečku a podívej se, co svítí. Nejvíc vypovídají H (chycení prodejci), E (absorpce), C (sweep) a G (close).</div></li>
       <li><div><strong>Prázdný C1 = order flow souhlasí, čekáš na break.</strong> Když close prorazí čáru do 30 minut, objeví se kroužek a C1 se vyplní. Když ne, C1 zešedne a setup nech být.</div></li>
-      <li><div><strong>Po breaku najeď na kroužek nebo plný C1.</strong> Uvidíš F5, F7, SL pod A a OP. Limit do F7 vycházel v datech nejlépe. Pokud cena po breaku ještě poroste, B a s ním F5/F7 se posunou, takže limit případně přesuň.</div></li>
+      <li><div><strong>Od 17:45 sleduj B.</strong> Break pivotu je rovnou signál. Skóre v tooltipu řekne, jak silný order flow za breakem stál: s 80+ cena došla k původu pohybu v 73 % případů, pod 65 jen v 56 %.</div></li>
+      <li><div><strong>Po breaku najeď na kroužek, plný C1 nebo B.</strong> Uvidíš F5, F7, SL pod A a OP. Limit do F7 vycházel v datech nejlépe. Pokud cena po breaku ještě poroste, B a s ním F5/F7 se posunou, takže limit případně přesuň.</div></li>
       <li><div><strong>R je druhá silná možnost.</strong> Retest s vyšším low a slabou deltou, limit na VPOC svíčky R, stop pod low tečky.</div></li>
       <li><div><strong>Nové low pod tečkou = konec.</strong> Obchodní myšlenka padla, nečekej na zázrak.</div></li>
       <li><div><strong>Pozor na zprávy.</strong> V okně ±5 minut kolem 14:30, 16:00 a 20:00 našeho času (8:30, 10:00 a 14:00 New York) se orderflow čte špatně. Tooltip na to upozorní.</div></li>
@@ -517,6 +526,7 @@ SL pod A: 7217 · TP (OP od F5): 7236,75</div>
           <tr><td>ETH od / do (můj čas)</td><td class="mono">8:00 / 15:00</td><td>Podle toho, kdy sedíš u grafu</td></tr>
           <tr><td>Platné až po breaku struktury (BOS)</td><td class="mono">zapnuto</td><td>Vypni, pokud chceš C1/C2 jen podle order flow</td></tr>
           <tr><td>Čekat na BOS po potvrzení</td><td class="mono">30 min</td><td>Kratší = přísnější</td></tr>
+          <tr><td>Od daného času jen break struktury (B)</td><td class="mono">zapnuto, 17:45</td><td>Čas změň podle toho, odkdy obchoduješ čistě break</td></tr>
           <tr><td>F jen po platném C1/C2</td><td class="mono">vypnuto</td><td>Zapni, pokud chceš F jen s order-flow potvrzením</td></tr>
           <tr><td>Tečka: min. skóre k zobrazení</td><td class="mono">60</td><td>75 = uvidíš jen silné reversaly (i jejich čáry)</td></tr>
           <tr><td>Tečkovaně pivot · neplatná potvrzení šedě</td><td class="mono">zapnuto</td><td>Vypni, pokud chceš ještě čistší graf</td></tr>

@@ -115,6 +115,28 @@ namespace ReversalConfirmation.Tests
         }
 
         [Fact]
+        public void BreakMode_TheBreakItselfIsTheSignal_RatedByItsOrderFlow()
+        {
+            var sc = FlushReclaim(anomaly: false);
+            var st = Settings(sc, onlyManual: true);
+            st.BreakModeFrom = new TimeSpan(16, 0, 0);   // the pattern runs ~16:30 Prague
+            var sink = new MemorySink();
+            var e = Run(sc.S.Bars, st, sink);
+
+            var rev = e.Marks.Single(m => m.Type == MarkType.Reversal && m.Bar == sc.RevBar);
+            int breakBar = sc.ConfBar + 5;
+            Assert.DoesNotContain(e.Marks, m => m.Type == MarkType.Confirmation && m.ContextId == rev.ContextId);
+            var b = e.Marks.Single(m => m.Type == MarkType.Break && m.ContextId == rev.ContextId);
+            Assert.Equal(breakBar, b.Bar);
+            Assert.Equal(breakBar, b.ValidBar);
+            Assert.InRange(b.Score, 0, 100);
+            Assert.Contains("BREAK STRUKTURY", b.Tooltip);
+            Assert.Contains(e.Events, ev => ev.Type == EngineEventType.Confirmation && ev.Bar == breakBar && ev.Text.StartsWith("B break"));
+            Assert.DoesNotContain(e.Events, ev => ev.Type == EngineEventType.ConfirmationPending);
+            Assert.Contains(sink.Rows, r => r.Get("kind") == "BRK" && r.Get("bar") == breakBar.ToString());
+        }
+
+        [Fact]
         public void Confirmation_ExpiresWhenTheBreakDoesNotComeInTime()
         {
             var sc = FlushReclaim((s, p) =>

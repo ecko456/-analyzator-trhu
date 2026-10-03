@@ -9,6 +9,8 @@ namespace ReversalConfirmation.Core
         Confirmation,
         Retest,
         FiboEntry,
+        /// <summary>Break mode (from 17:45): the breaking candle itself is the signal, rated by its order flow.</summary>
+        Break,
         /// <summary>Break of structure: end of the dotted pivot line (Price = the broken level).</summary>
         StructureBreak,
         AbsorptionFailed,

@@ -57,6 +57,7 @@ Výchozí zobrazení je minimalistické: agent jen označí svíčky, které nej
 | tečkovaná čára | pivot, který musí padnout (break struktury, BOS): bullish poslední nižší high vlevo od low A, u anomálie (A = outside bar s novým low) high svíčky A. Bearish zrcadlově. Čára pokračuje, dokud setup žije. Šedá = break nepřišel |
 | kroužek na konci čáry | break struktury (close za pivotem). Tooltip: F5, F7, SL pod A, TP OP |
 | čtvereček **C1 / C2** | potvrzení: druhá strana převzala iniciativu (max 2 na reversal). **Prázdný** = čeká na break (max 30 min), **plný** = platné, **šedý** = break nepřišel |
+| čtvereček **B** | od 17:45 (nastavitelné): break struktury jako signál, bez čekání na C. Tooltip: order-flow skóre svíčky s breakem a F5/F7/SL/OP |
 | čtvereček **R** | retest: vyšší low (u bearish nižší high) blízko extrému se slabou deltou, v datech nejstabilnější místo pro vstup |
 | čtvereček **F** | návrat do F5 (61,8 %) impulsu A→B po breaku. Tooltip: F5, F7 (78,9 %), SL pod A, TP OP |
 
@@ -85,7 +86,7 @@ Alerty (zvuk + popup): ve výchozím stavu platné C1/C2, C1/C2 čekající na b
 | | min. skóre · silný | 60 · 75 |
 | | ATR · dní pro time-of-day | ATR14 · 10 |
 | Potvrzení | platné až po breaku struktury · čekat na BOS · BOS na close | ano · 30 min · ano |
-| | F jen po platném C1/C2 | ne |
+| | F jen po platném C1/C2 · od daného času jen break (B) | ne · ano, 17:45 |
 | | P · max potvrzení | 6 · 2 |
 | | z delty · CLV · efektivita · imbalance · min. skóre | 1 · 0,6 · 40. pct · 3:1 · 60 |
 | Zóny | typy | VPOC potvrzení + retest |
@@ -138,7 +139,7 @@ Replay zvládne ~140 000 svíček za ~10 s a ošetřuje kvartální rolly.
 ## Vývoj
 
 ```bash
-dotnet test tests/Core.Tests -c Release                                          # 38 testů
+dotnet test tests/Core.Tests -c Release                                          # 39 testů
 dotnet build src/Atas/ReversalConfirmation.Atas.csproj -c Release -p:AtasStubs=true  # kontrola kompilace bez ATAS
 dotnet build tools/AtasHarness -c Release -p:AtasStubs=true                        # simulace volání ATAS + měření výkonu
 ```

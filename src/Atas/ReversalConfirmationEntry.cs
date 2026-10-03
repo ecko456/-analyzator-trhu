@@ -317,6 +317,12 @@ namespace ReversalConfirmation.Atas
         [Range(0, 240)]
         public int BosWaitMinutes { get => _s.BosWaitMinutes; set { _s.BosWaitMinutes = value; RecalculateValues(); } }
 
+        [Display(Name = "Od daného času jen break struktury (B)", GroupName = GConfirm, Order = 5, Description = "Od tohoto času (můj čas) se nečeká na order-flow svíčku C: signálem je samotný break struktury (čtvereček B) a order flow svíčky s breakem ho jen ohodnotí (skóre v tooltipu).")]
+        public bool BreakMode { get => _s.BreakMode; set { _s.BreakMode = value; RecalculateValues(); } }
+
+        [Display(Name = "Break režim od (můj čas)", GroupName = GConfirm, Order = 6)]
+        public TimeSpan BreakModeFrom { get => _s.BreakModeFrom; set { _s.BreakModeFrom = value; RecalculateValues(); } }
+
         [Display(Name = "BOS jen na close (ne knotem)", GroupName = GConfirm, Order = 3)]
         public bool BosOnClose { get => _s.BosOnClose; set { _s.BosOnClose = value; RecalculateValues(); } }
 
@@ -489,7 +495,7 @@ namespace ReversalConfirmation.Atas
 
         #region Parameters: alerts
 
-        [Display(Name = "Alert: potvrzení C1/C2", GroupName = GAlerts, Order = 10)]
+        [Display(Name = "Alert: potvrzení C1/C2 a break B", GroupName = GAlerts, Order = 10)]
         public bool AlertConfirmation { get; set; } = true;
 
         [Display(Name = "Alert: retest R", GroupName = GAlerts, Order = 20)]
@@ -819,6 +825,7 @@ namespace ReversalConfirmation.Atas
             {
                 case MarkType.Reversal: return m.Score >= DotMinScore;
                 case MarkType.Confirmation: return ShowConfirmations && (!m.Expired || ShowExpired);
+                case MarkType.Break: return ShowConfirmations;
                 case MarkType.Retest: return ShowRetests;
                 case MarkType.FiboEntry: return ShowFibo;
                 case MarkType.StructureBreak: return ShowStructure && m.Score >= DotMinScore;
@@ -835,7 +842,7 @@ namespace ReversalConfirmation.Atas
             int y = Y(m.Price);
             // ring on the broken level, just right of the breaking candle (on its body it would vanish)
             if (m.Type == MarkType.StructureBreak) return new Point(X(m.Bar) + BarWidth + 6, y);
-            int step = m.Type == MarkType.Reversal ? 8 : m.Type == MarkType.Confirmation || m.Type == MarkType.Retest ? 20 : 32;
+            int step = m.Type == MarkType.Reversal ? 8 : m.Type == MarkType.Confirmation || m.Type == MarkType.Break || m.Type == MarkType.Retest ? 20 : 32;
             int off = RowHalf + step;
             return new Point(x, m.Dir > 0 ? y + off : y - off);
         }
@@ -873,6 +880,9 @@ namespace ReversalConfirmation.Atas
                         break;
                     case MarkType.FiboEntry:
                         Label(g, "F", col, c.X, c.Y, true);
+                        break;
+                    case MarkType.Break:
+                        Label(g, "B", col, c.X, c.Y, true);
                         break;
                     case MarkType.StructureBreak:
                         g.DrawEllipse(new RenderPen(col, 2), new Rectangle(c.X - 4, c.Y - 4, 8, 8));

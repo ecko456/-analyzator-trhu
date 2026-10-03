@@ -228,6 +228,12 @@ namespace ReversalConfirmation.Core
         /// confirmation becomes valid on the breaking candle, otherwise it expires.
         /// </summary>
         public int BosWaitMinutes = 30;
+        /// <summary>
+        /// Break mode: from this time (trader's clock) the signal is the break of structure itself, rated by the order flow
+        /// of the breaking candle (square B), instead of an order-flow candle C waiting for the break.
+        /// </summary>
+        public bool BreakMode = true;
+        public TimeSpan BreakModeFrom = new TimeSpan(17, 45, 0);
         public int BosLookback = 40;
         /// <summary>Fibo entry without a confirmation: how long after the extreme the BOS may come.</summary>
         public int BosMaxBars = 24;
